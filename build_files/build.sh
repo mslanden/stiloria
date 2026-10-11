@@ -59,6 +59,18 @@ grep -q '"file-raw"' "$fastfetch_config"
 grep -q stiloria/fastfetch-logo.txt "$fastfetch_config"
 grep -q stiloria-fetch-image "$fastfetch_config"
 
+### From boot to desktop: the Plasma themes Bazzite uses for new accounts
+for theme in /usr/share/plasma/look-and-feel/com.valve.{vapor,vgui}.desktop/contents; do
+    # The loading screen after login: the helmet on its black background.
+    gzip -9 -n -c /usr/share/stiloria/stiloria-logo-light.svg > "$theme/splash/images/bazzite_logo.svgz"
+    # The start-menu button; existing accounts get it from stiloria-user-setup.
+    sed -i 's|"distributor-logo-steamdeck"|"stiloria-start"|' "$theme/plasmoidsetupscripts/org.kde.plasma.kickoff.js"
+    grep -q stiloria-start "$theme/plasmoidsetupscripts/org.kde.plasma.kickoff.js"
+done
+# The login screen's background.
+sed -i "s|file:///usr/share/backgrounds/default.jxl|file://$wallpaper|g" /usr/lib/plasmalogin/defaults.conf
+grep -q "$wallpaper" /usr/lib/plasmalogin/defaults.conf
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
