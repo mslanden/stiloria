@@ -40,3 +40,11 @@ if ((done_steps < 2)); then
         });' >/dev/null || exit 0
     done_with 2
 fi
+
+# 3: Stiloria's colors, with the Breeze Plasma style so the panel and menus
+# follow them (Vapor's Plasma style has fixed colors)
+if ((done_steps < 3)); then
+    plasma-apply-colorscheme Stiloria >/dev/null 2>&1 || exit 0
+    plasma-apply-desktoptheme default >/dev/null 2>&1 || exit 0
+    done_with 3
+fi

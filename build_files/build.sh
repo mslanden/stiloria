@@ -71,6 +71,30 @@ done
 sed -i "s|file:///usr/share/backgrounds/default.jxl|file://$wallpaper|g" /usr/lib/plasmalogin/defaults.conf
 grep -q "$wallpaper" /usr/lib/plasmalogin/defaults.conf
 
+### Colors: navy and gold from the logo and wallpapers (Stiloria.colors)
+# A new account gets the colors its global theme, Bazzite's Vapor, names: at
+# the first login startplasma copies the theme's defaults into
+# ~/.config/kdedefaults, which overrides /etc/xdg/kdeglobals, and applies that
+# ColorScheme. Window title bars follow the scheme's Header colors. Vapor's
+# Plasma style has fixed colors of its own, so the panel and menus get Breeze's
+# ("default"), which is otherwise the same and follows the scheme. Existing
+# accounts get both once from stiloria-user-setup. VGUI, Valve's retro theme,
+# keeps its own colors.
+lnf_defaults=/usr/share/plasma/look-and-feel/com.valve.vapor.desktop/contents/defaults
+test -f /usr/share/color-schemes/Stiloria.colors
+test -f /usr/share/plasma/desktoptheme/default/metadata.json
+sed -i -e 's/^ColorScheme=Vapor$/ColorScheme=Stiloria/' -e 's/^name=Vapor$/name=default/' "$lnf_defaults"
+grep -qx ColorScheme=Stiloria "$lnf_defaults"
+grep -qx name=default "$lnf_defaults"
+# Konsole's matching profile. Bazzite names the default profile in
+# /etc/xdg/kdeglobals, which konsolerc falls back to, so it applies to every
+# account that hasn't picked one; a DefaultProfile in /etc/xdg/konsolerc would
+# hide it.
+test -f /usr/share/konsole/Stiloria.profile
+sed -i 's/^DefaultProfile=Vapor.profile$/DefaultProfile=Stiloria.profile/' /etc/xdg/kdeglobals
+grep -qx DefaultProfile=Stiloria.profile /etc/xdg/kdeglobals
+test -z "$(grep -s '^DefaultProfile=' /etc/xdg/konsolerc)"
+
 ### Boot screen: Stiloria's watermark under the firmware logo (Plymouth's bgrt
 # theme draws spinner/watermark.png). Plymouth runs from the initramfs, so
 # rebuild it with Bazzite's own dracut settings (/usr/lib/dracut/dracut.conf.d:
