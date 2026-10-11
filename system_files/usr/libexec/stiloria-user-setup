@@ -1,24 +1,42 @@
 #!/usr/bin/bash
-# Run at each Plasma login. Applies Stiloria's look once per user and per
-# VERSION, so someone switching from Bazzite gets the Stiloria wallpaper, and a
-# wallpaper they pick afterwards is never overwritten. Raise VERSION to apply a
-# new default to everyone once more.
-VERSION=1
+# Run at each Plasma login. Each numbered step runs once per user, so someone
+# switching from Bazzite gets Stiloria's look, and whatever they change
+# afterwards is never overwritten. To roll a new default out to everyone once,
+# add a step with the next number.
 state="${XDG_STATE_HOME:-$HOME/.local/state}/stiloria/user-setup"
-if [[ -f $state ]] && (($(cat "$state") >= VERSION)); then
-    exit 0
-fi
+done_steps=0
+[[ -f $state ]] && done_steps=$(cat "$state")
+done_with() {
+    mkdir -p "$(dirname "$state")"
+    echo "$1" > "$state"
+}
 
-wallpaper=/usr/share/wallpapers/Stiloria/contents/images/3840x2160.jpg
-# Plasma may still be starting when autostart runs; wait for it a little.
+# Plasma may still be starting when autostart runs; wait for it a little, and
+# if it never answers, try again at the next login.
 for _ in $(seq 1 20); do
-    plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 && applied=1 && break
+    qdbus org.kde.plasmashell /PlasmaShell >/dev/null 2>&1 && ready=1 && break
     sleep 3
 done
-# Not applied (Plasma never answered): leave the state alone and try next login.
-[[ -n ${applied:-} ]] || exit 0
-kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$wallpaper"
-kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key PreviewImage "file://$wallpaper"
+[[ -n ${ready:-} ]] || exit 0
 
-mkdir -p "$(dirname "$state")"
-echo "$VERSION" > "$state"
+# 1: wallpaper and lock screen
+if ((done_steps < 1)); then
+    wallpaper=/usr/share/wallpapers/Stiloria/contents/images/3840x2160.jpg
+    plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 || exit 0
+    kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$wallpaper"
+    kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key PreviewImage "file://$wallpaper"
+    done_with 1
+fi
+
+# 2: the start-menu button shows the Stiloria helmet
+if ((done_steps < 2)); then
+    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+        panels().forEach(function (panel) {
+            panel.widgets("org.kde.plasma.kickoff").forEach(function (launcher) {
+                launcher.currentConfigGroup = ["General"];
+                launcher.writeConfig("icon", "stiloria-start");
+                launcher.reloadConfig();
+            });
+        });' >/dev/null || exit 0
+    done_with 2
+fi
