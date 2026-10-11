@@ -23,6 +23,10 @@ Older NVIDIA cards (GTX 10-series and earlier) aren't supported yet. Switching a
    systemctl reboot
    ```
 
+## Signed updates
+
+Every build is signed with this repo's key (`cosign.pub` is its public half). Stiloria carries a container policy that accepts a `stiloria` or `stiloria-nvidia` image only with that signature, so once a machine runs Stiloria, every update it downloads is verified and anything else is rejected. The first switch from Bazzite can't check this yet, because Bazzite doesn't know the key; everything after it is checked.
+
 ## Repo layout
 
 | Path | What it does |
