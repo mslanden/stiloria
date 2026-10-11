@@ -1,0 +1,14 @@
+# On the live system / is an overlay kept in /run, a small tmpfs, but ostree
+# writes several GB to /var/tmp while installing. Give /var/tmp its own
+# tmpfs, sized from RAM. From Bazzite's installer.
+[Unit]
+Description=Larger tmpfs for /var/tmp on the live system
+
+[Mount]
+What=tmpfs
+Where=/var/tmp
+Type=tmpfs
+Options=size=50%%,nr_inodes=1m,x-systemd.graceful-option=usrquota
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,13 @@
+# The apps on the stick are copied as-is to the installed system, so keep the
+# live session from changing them. From Bazzite's installer.
+[Unit]
+Description=Read-only Flatpak apps on the live system
+
+[Mount]
+What=/var/lib/flatpak
+Where=/var/lib/flatpak
+Type=none
+Options=bind,ro
+
+[Install]
+WantedBy=multi-user.target

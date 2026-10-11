@@ -1,115 +1,149 @@
 ---
-name: Build disk images
+name: Build installer ISOs
 
+# One ISO per edition, made from the images build.yml publishes: a live
+# Plasma session on a USB stick that installs Stiloria (installer/). Built the
+# way Bazzite builds its own ISOs, with Titanoboa. Not on every push: an ISO is
+# about 8 GB and only needed to set up a new machine, which then updates
+# itself. Run it from the Actions tab, or publish a release.
 on:
   workflow_dispatch:
-    inputs:
-      upload-to-s3:
-        description: "Upload to S3"
-        required: false
-        default: false
-        type: boolean
-      platform:
-        required: true
-        type: choice
-        options:
-          - amd64
-          - arm64
-  pull_request:
-    branches:
-      - main
-    paths:
-      - './disk_config/disk.toml'
-      - './disk_config/iso.toml'
-      - './.github/workflows/build-disk.yml'
+  release:
+    types: [published]
 
 env:
   IMAGE_NAME: ${{ github.event.repository.name }} # output of build.yml, keep in sync
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
   DEFAULT_TAG: "latest"
-  BIB_IMAGE: "quay.io/centos-bootc/bootc-image-builder:latest"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build disk images
-    runs-on: ${{ inputs.platform == 'amd64' && 'ubuntu-26.04' || 'ubuntu-26.04-arm' }}
+  build_iso:
+    name: Build ISO (${{ matrix.edition }})
+    runs-on: ubuntu-26.04
+
     strategy:
       fail-fast: false
       matrix:
-        disk-type: ["qcow2", "anaconda-iso"]
+        include:
+          - edition: amd-intel
+            image_suffix: ""
+          - edition: nvidia
+            image_suffix: "-nvidia"
+
     permissions:
       contents: read
-      packages: read
-      id-token: write
 
     steps:
-      - name: Prepare environment
-        run: |
-          USER_UID=$(id -u)
-          USER_GID=$(id -g)
-          # Concatenate the types with a hyphen
-          DISK_TYPE=$(echo "${{ matrix.disk-type }}" | tr ' ' '-')
-          # Lowercase the image uri
-          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
-          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
-          echo "DISK_TYPE=${DISK_TYPE}" >> ${GITHUB_ENV}
-          echo "USER_UID=${USER_UID}" >> ${GITHUB_ENV}
-          echo "USER_GID=${USER_GID}" >> ${GITHUB_ENV}
-
-      - name: Install dependencies
-        if: inputs.platform == 'arm64'
-        run: |
-          set -x
-          sudo apt update -y
-          sudo apt install -y \
-            podman
-
-      - name: Maximize build space
-        if: inputs.platform != 'arm64'
-        uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
-        with:
-          remove-codeql: true
-
+      # These stage versions are pinned by https://github.com/renovatebot/renovate
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Build disk images
-        id: build
-        uses: osbuild/bootc-image-builder-action@8661cd3832544ad68c12dcde8681b13ab0f56a8d # main
-        with:
-          builder-image: ${{ env.BIB_IMAGE }}
-          config-file: ${{ matrix.disk-type == 'anaconda-iso' && './disk_config/iso.toml' || './disk_config/disk.toml' }}
-          image: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}
-          chown: ${{ env.USER_UID }}:${{ env.USER_GID }}
-          types: ${{ matrix.disk-type }}
-          additional-args: --use-librepo=True
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
 
-      - name: Upload disk images and Checksum to Job Artifacts
-        if: inputs.upload-to-s3 != true && github.event_name != 'pull_request'
+      - name: Prepare environment
+        run: |
+          # Lowercase the image uri https://github.com/macbre/push-to-ghcr/issues/12
+          IMAGE_REGISTRY=${IMAGE_REGISTRY,,}
+          IMAGE_NAME=${IMAGE_NAME,,}
+          # Both ISOs boot the AMD/Intel edition and install their own.
+          echo "LIVE_IMAGE=${IMAGE_REGISTRY}/${IMAGE_NAME}:${DEFAULT_TAG}" >> $GITHUB_ENV
+          echo "INSTALL_IMAGE=${IMAGE_REGISTRY}/${IMAGE_NAME}${{ matrix.image_suffix }}:${DEFAULT_TAG}" >> $GITHUB_ENV
+          echo "ISO_NAME=${IMAGE_NAME}${{ matrix.image_suffix }}-amd64.iso" >> $GITHUB_ENV
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # be careful when upgrading major versions
+          cosign-release: 'v3.1.2'
+
+      # Only images signed with Stiloria's key go on the stick, and exactly the
+      # builds checked here: the live system is built from this digest, and
+      # installer/build.sh pulls the image to install by its digest (inside
+      # Stiloria, whose policy.json checks the signature again).
+      - name: Verify image signatures
+        run: |
+          set -euo pipefail
+          verify() {
+            cosign verify --key cosign.pub "$1" | jq -er '.[0].critical.image."docker-manifest-digest"'
+          }
+          live_digest=$(verify "$LIVE_IMAGE")
+          install_digest=$(verify "$INSTALL_IMAGE")
+          echo "LIVE_IMAGE_REF=${LIVE_IMAGE%:*}@${live_digest}" >> $GITHUB_ENV
+          echo "INSTALL_DIGEST=${install_digest}" >> $GITHUB_ENV
+          echo "Installs ${INSTALL_IMAGE} (${install_digest}), live system ${LIVE_IMAGE} (${live_digest})"
+
+      # Two Stiloria images (the live system and the copy it installs) and the
+      # squashfs made of them need more room than the runner has, so put
+      # container storage on a compressed btrfs file, as Bazzite's ISO builds do.
+      - name: Mount container storage on compressed btrfs
+        run: |
+          set -euxo pipefail
+          command -v mkfs.btrfs || { sudo apt-get update && sudo apt-get install -y btrfs-progs; }
+          sudo truncate -s 110G /mnt/podman-storage.img
+          sudo mkfs.btrfs -f -m single -d single /mnt/podman-storage.img
+          sudo podman system reset --force
+          LOOP=$(sudo losetup --find --show --direct-io=on /mnt/podman-storage.img)
+          sudo mkdir -p /mnt/podman-storage
+          sudo mount -o compress-force=zstd:2,discard=async,noatime "$LOOP" /mnt/podman-storage
+          sudo mkdir -p /mnt/podman-storage/storage /mnt/podman-storage/tmp /var/lib/containers/storage
+          sudo mount --bind /mnt/podman-storage/storage /var/lib/containers/storage
+          df -h / /mnt/podman-storage
+
+      - name: Build the live system
+        run: |
+          sudo env TMPDIR=/mnt/podman-storage/tmp podman build \
+            --cap-add sys_admin \
+            --security-opt label=disable \
+            --build-arg BASE_IMAGE="$LIVE_IMAGE_REF" \
+            --build-arg INSTALL_IMAGE="$INSTALL_IMAGE" \
+            --build-arg INSTALL_DIGEST="$INSTALL_DIGEST" \
+            --tag localhost/stiloria-installer:latest \
+            installer/
+
+      - name: Build ISO
+        id: build
+        uses: ublue-os/titanoboa@5c457c3d0518bd17e754be0fd98a60d29d26abb4 # main
+        with:
+          image-ref: localhost/stiloria-installer:latest
+          iso-dest: ${{ env.ISO_NAME }}
+
+      - name: Checksum
+        env:
+          ISO_PATH: ${{ steps.build.outputs.iso-dest }}
+        run: |
+          set -euo pipefail
+          mkdir -p upload
+          mv "$ISO_PATH" "upload/$ISO_NAME"
+          cd upload
+          sha256sum "$ISO_NAME" | tee "$ISO_NAME-CHECKSUM"
+          {
+            echo "### $ISO_NAME"
+            echo "$(du -h "$ISO_NAME" | cut -f1), installs \`$INSTALL_IMAGE\` (\`$INSTALL_DIGEST\`)"
+            echo '```'
+            cat "$ISO_NAME-CHECKSUM"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          sudo df -h / /mnt/podman-storage
+
+      # Uploaded unzipped, so the ISO downloads as an .iso file. These are run
+      # artifacts only: a GitHub release asset can't be over 2 GiB.
+      - name: Upload ISO
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          path: ${{ steps.build.outputs.output-directory }}
+          path: upload/${{ env.ISO_NAME }}
+          archive: false
           if-no-files-found: error
-          retention-days: 0
-          compression-level: 0
-          overwrite: true
-      
-      - name: Upload to S3
-        if: inputs.upload-to-s3 == true && github.event_name != 'pull_request'
-        shell: bash
-        env:
-          RCLONE_CONFIG_S3_TYPE: s3
-          RCLONE_CONFIG_S3_PROVIDER: ${{ secrets.S3_PROVIDER }}
-          RCLONE_CONFIG_S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
-          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-          RCLONE_CONFIG_S3_REGION: ${{ secrets.S3_REGION }}
-          RCLONE_CONFIG_S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
-          SOURCE_DIR: ${{ steps.build.outputs.output-directory }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rclone
-          rclone copy $SOURCE_DIR S3:${{ secrets.S3_BUCKET_NAME }}
+          retention-days: 30
+
+      - name: Upload checksum
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: upload/${{ env.ISO_NAME }}-CHECKSUM
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
