@@ -78,8 +78,12 @@ mkdir -p /var/lib/rpm-state
 cp -rv /src/system_files/. /
 sed "s|@INSTALL_IMAGE@|$INSTALL_IMAGE|g" /src/stiloria.ks >> /usr/share/anaconda/interactive-defaults.ks
 grep -q "^ostreecontainer --url=$INSTALL_IMAGE " /usr/share/anaconda/interactive-defaults.ks
-# The installer takes its title from here: "Stiloria 44".
+# The installer takes its title from here ("Stiloria installation") and its
+# welcome from os-release's NAME ("Let's install Stiloria now"), which the
+# installed system keeps as Bazzite's.
 echo "Stiloria release $(rpm -E %fedora)" > /etc/system-release
+sed -i 's/^NAME=.*/NAME="Stiloria"/' /usr/lib/os-release
+grep -qx 'NAME="Stiloria"' /usr/lib/os-release
 # ostree needs room in /var/tmp; the apps on the stick stay as installed.
 rm -rf /var/tmp
 mkdir /var/tmp
@@ -96,7 +100,9 @@ for unit in rpm-ostreed-automatic.timer rpm-ostree-countme.service uupd.timer \
         systemctl disable "$unit"
     fi
 done
-rm -f /etc/skel/.config/autostart/steam.desktop
+# At login the installer opens (system_files/etc/xdg/autostart), instead of
+# Steam and Bazzite's portal for setting up an installed system.
+rm -f /etc/skel/.config/autostart/steam.desktop /etc/skel/.config/autostart/bazzite-portal.desktop
 
 ### The stick's bootloader, laid out as on Fedora's own ISOs: shim
 # (EFI/BOOT/BOOTX64.EFI) starts GRUB's CD build as EFI/BOOT/grubx64.efi, which

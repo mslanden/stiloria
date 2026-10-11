@@ -21,7 +21,7 @@ Older NVIDIA cards (GTX 10-series and earlier) aren't supported yet. Switching a
 
 1. Download the ISO for your card from the latest successful run of [Build installer ISOs](https://github.com/mslanden/stiloria/actions/workflows/build-disk.yml): open the run and scroll to **Artifacts** (downloading needs a GitHub account). The run's summary lists each ISO's SHA-256.
 2. Write it to a USB stick of 16 GB or more with [Fedora Media Writer](https://github.com/FedoraQt/MediaWriter/releases) or [balenaEtcher](https://etcher.balena.io/), or with Rufus in "DD Image" mode. This erases the stick.
-3. Start the PC from the stick, in UEFI mode; Secure Boot can stay on. A live Plasma desktop opens: choose **Install to Hard Drive** and pick the disk, language and your account. Everything is installed from the stick, so no network is needed.
+3. Start the PC from the stick, in UEFI mode; Secure Boot can stay on. The installer opens on a live Plasma desktop (closed, it's on the desktop as **Install to Hard Drive**): pick the language, the disk and your account. Everything is installed from the stick, so no network is needed.
 4. On the first restart, a blue *Perform MOK management* screen appears once. Choose **Enroll MOK**, **Continue**, **Yes**, type the password `universalblue`, then **Reboot**. This lets Secure Boot start Bazzite's kernel, which Universal Blue signs.
 
 ### From Bazzite
