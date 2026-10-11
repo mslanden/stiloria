@@ -71,6 +71,26 @@ done
 sed -i "s|file:///usr/share/backgrounds/default.jxl|file://$wallpaper|g" /usr/lib/plasmalogin/defaults.conf
 grep -q "$wallpaper" /usr/lib/plasmalogin/defaults.conf
 
+### Boot screen: Stiloria's watermark under the firmware logo (Plymouth's bgrt
+# theme draws spinner/watermark.png). Plymouth runs from the initramfs, so
+# rebuild it with Bazzite's own dracut settings (/usr/lib/dracut/dracut.conf.d:
+# generic, reproducible, zstd) and fail the build unless it still carries
+# exactly the same dracut modules, ostree among them.
+install -m644 /usr/share/stiloria/plymouth-watermark.png /usr/share/plymouth/themes/spinner/watermark.png
+kernel=$(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+test "$(wc -l <<< "$kernel")" = 1
+initramfs=/usr/lib/modules/$kernel/initramfs.img
+modules() { lsinitrd -m "$1" | sed -n '/dracut modules:/,$p' | tail -n +2 | sort; }
+modules "$initramfs" > /tmp/initramfs-modules.before
+# /root links to /var/roothome, which only exists once booted; the original
+# initramfs has it, so give dracut something to copy, then remove it again.
+mkdir -p /var/roothome
+dracut --no-hostonly --kver "$kernel" --add ostree --force "$initramfs"
+rmdir /var/roothome
+chmod 0600 "$initramfs"
+modules "$initramfs" | diff /tmp/initramfs-modules.before -
+lsinitrd -f usr/share/plymouth/themes/spinner/watermark.png "$initramfs" | cmp - /usr/share/stiloria/plymouth-watermark.png
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
