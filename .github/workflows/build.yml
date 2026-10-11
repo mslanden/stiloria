@@ -110,17 +110,27 @@ jobs:
           fi
           echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
 
+      # A quiet fetch of the pinned commit rather than actions/checkout, which
+      # prints the commit's subject line ("HEAD is now at …") to this public log.
+      # Only GitHub's published host key is accepted, and the deploy key is
+      # deleted as soon as the source is here, whether or not the fetch worked.
       - name: Check out Achilles
         if: steps.key.outputs.available == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          repository: mslanden/achilles
-          ref: ${{ steps.pin.outputs.sha }}
-          ssh-key: ${{ secrets.ACHILLES_DEPLOY_KEY }}
-          path: achilles
-          # Remove the key once the source is here.
-          persist-credentials: false
-          show-progress: false
+        env:
+          DEPLOY_KEY: ${{ secrets.ACHILLES_DEPLOY_KEY }}
+          PIN: ${{ steps.pin.outputs.sha }}
+        run: |
+          key="${RUNNER_TEMP}/achilles-deploy-key"
+          known="${RUNNER_TEMP}/github-known-hosts"
+          trap 'rm -f "${key}"' EXIT
+          (umask 077 && printf '%s\n' "${DEPLOY_KEY}" > "${key}")
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "${known}"
+          export GIT_SSH_COMMAND="ssh -i ${key} -o IdentitiesOnly=yes -o UserKnownHostsFile=${known} -o StrictHostKeyChecking=yes -o LogLevel=ERROR"
+          git init -q achilles
+          git -C achilles fetch -q --depth 1 git@github.com:mslanden/achilles.git "${PIN}"
+          git -C achilles -c advice.detachedHead=false checkout -q FETCH_HEAD
+          test "$(git -C achilles rev-parse HEAD)" = "${PIN}"
+          echo "Checked out mslanden/achilles at ${PIN}."
 
       # Pull requests, forks' included, can restore these caches, so they hold
       # nothing built from Achilles' source: rust-cache keeps only third-party
