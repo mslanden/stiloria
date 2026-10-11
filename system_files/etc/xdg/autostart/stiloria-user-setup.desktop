@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Stiloria user setup
-Comment=Applies Stiloria's wallpaper once per user
+Comment=Applies Stiloria's wallpaper, start-menu icon and colors once per user
 Exec=/usr/libexec/stiloria-user-setup
 OnlyShowIn=KDE;
 NoDisplay=true
