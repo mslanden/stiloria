@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+# Install the apps in /usr/share/stiloria/flatpaks that this machine has never
+# been offered. Remembering what was offered, rather than what is installed,
+# means an app the user removed stays removed.
+set -euo pipefail
+
+list=/usr/share/stiloria/flatpaks
+offered=/var/lib/stiloria/flatpaks-offered
+mkdir -p "$(dirname "$offered")"
+touch "$offered"
+
+new=()
+while read -r app; do
+    [[ -z $app || $app == \#* ]] && continue
+    grep -qxF "$app" "$offered" || new+=("$app")
+done < "$list"
+
+if ((${#new[@]} == 0)); then
+    echo "No new Stiloria apps to install."
+    exit 0
+fi
+
+# Bazzite's flatpak manager sets up the Flathub remote; make sure it exists anyway.
+flatpak remote-add --if-not-exists --system flathub /etc/flatpak/remotes.d/flathub.flatpakrepo || :
+# On failure (no network yet) nothing is recorded, and the service retries.
+flatpak install --system --noninteractive --or-update flathub "${new[@]}"
+printf '%s\n' "${new[@]}" >> "$offered"
+echo "Installed: ${new[*]}"

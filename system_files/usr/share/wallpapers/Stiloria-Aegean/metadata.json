@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Id": "Stiloria-Aegean",
+        "Name": "Aegean Dawn",
+        "License": "CC-BY-SA-4.0",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ]
+    }
+}
