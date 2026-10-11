@@ -44,6 +44,21 @@ done
 ### Recommended apps: system_files/usr/share/stiloria/flatpaks
 systemctl enable stiloria-flatpak-manager.service
 
+### Signed tracking: after the first switch from Bazzite, move to verified updates
+systemctl enable stiloria-signed-tracking.service
+
+### fastfetch: Stiloria's helmet and image line in Bazzite's layout. The logo is
+# true-color half blocks, so it is printed raw and its size given explicitly.
+fastfetch_config=/usr/share/ublue-os/bazzite/fastfetch.jsonc
+sed -i \
+    -e 's|"type": "file",|"type": "file-raw",|' \
+    -e 's|"source": "/usr/share/ublue-os/bazzite/logo.txt",|"source": "/usr/share/stiloria/fastfetch-logo.txt", "width": 33, "height": 18,|' \
+    -e 's|/usr/libexec/bazzite-fetch-image|/usr/libexec/stiloria-fetch-image|' \
+    "$fastfetch_config"
+grep -q '"file-raw"' "$fastfetch_config"
+grep -q stiloria/fastfetch-logo.txt "$fastfetch_config"
+grep -q stiloria-fetch-image "$fastfetch_config"
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.

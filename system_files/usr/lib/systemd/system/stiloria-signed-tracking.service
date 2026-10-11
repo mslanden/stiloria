@@ -1,0 +1,11 @@
+[Unit]
+Description=Track the Stiloria image as signed, so updates are verified
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/stiloria-signed-tracking
+
+[Install]
+WantedBy=multi-user.target

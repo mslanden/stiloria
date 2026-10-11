@@ -1,0 +1,37 @@
+#!/usr/bin/bash
+# The first switch from Bazzite (`bootc switch ghcr.io/mslanden/stiloria...`)
+# tracks the image unverified, because Bazzite doesn't know Stiloria's key.
+# Stiloria does, so switch the same image to signed tracking: from the next
+# reboot on, every update is checked against Stiloria's key, and fastfetch
+# shows the lock closed. Does nothing once tracking is signed, for images that
+# aren't Stiloria's, or while another deployment is waiting for a reboot.
+set -euo pipefail
+
+ref=$(rpm-ostree status --json --booted | jq -r '.deployments[0]."container-image-reference" // ""')
+case $ref in
+    ostree-image-signed:*)
+        echo "Already tracking a signed image: $ref"
+        exit 0
+        ;;
+    ostree-unverified-registry:ghcr.io/mslanden/stiloria:* | ostree-unverified-registry:ghcr.io/mslanden/stiloria-nvidia:*)
+        image=${ref#ostree-unverified-registry:}
+        ;;
+    ostree-unverified-image:docker://ghcr.io/mslanden/stiloria:* | ostree-unverified-image:docker://ghcr.io/mslanden/stiloria-nvidia:*)
+        image=${ref#ostree-unverified-image:docker://}
+        ;;
+    *)
+        echo "Not a Stiloria image ($ref); leaving it alone."
+        exit 0
+        ;;
+esac
+
+# An update or a rebase someone started is already waiting: don't replace it.
+# This runs again after the reboot that applies it.
+if rpm-ostree status --json | jq -e '.deployments[] | select(.staged)' >/dev/null; then
+    echo "Another deployment is waiting for a reboot; trying again after it."
+    exit 0
+fi
+
+# Fails, changing nothing, if the image isn't signed with Stiloria's key.
+rpm-ostree rebase "ostree-image-signed:docker://$image"
+echo "Switched to signed tracking of $image; it applies at the next reboot."

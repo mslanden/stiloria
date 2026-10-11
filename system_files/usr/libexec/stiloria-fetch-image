@@ -1,0 +1,14 @@
+#!/usr/bin/bash
+# fastfetch's image line: the Stiloria image this machine runs, with Bazzite's
+# lock icons (closed when the image is tracked as signed). Bazzite's own line
+# reads image-info.json, which stays "bazzite" for Bazzite's tools.
+RED_FLASHING='\033[6;31m'
+
+ref=$(rpm-ostree status --json --booted | jq -r '.deployments[0]."container-image-reference" // ""')
+echo -n "${ref##*/}"
+
+if [[ $ref == ostree-image-signed:* ]]; then
+    echo -n -e " "
+else
+    echo -n -e " ${RED_FLASHING}"
+fi
