@@ -8,6 +8,9 @@ FROM scratch AS ctx
 COPY build_files /
 COPY system_files /system_files
 COPY cosign.pub /cosign.pub
+# Achilles' binary and icon, which the workflow's achilles job builds from its
+# private source. For a local build, see "Achilles" in the README.
+COPY achilles /achilles
 
 # Base Image
 FROM ${BASE_IMAGE}

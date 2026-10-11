@@ -21,8 +21,172 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Achilles, the desktop assistant, comes from the private mslanden/achilles
+  # at the commit in achilles.ref. It is built once, on Fedora 44 like Bazzite,
+  # and both editions install that binary. These logs are public and the source
+  # is not: the build's own output goes to a file that is never shown or
+  # uploaded, and only the binary and its icon leave this job.
+  achilles:
+    name: Build Achilles
+    runs-on: ubuntu-26.04
+    container: registry.fedoraproject.org/fedora:44
+
+    permissions:
+      contents: read
+
+    outputs:
+      built: ${{ steps.key.outputs.available }}
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      # Compiler warnings quote source lines; keep them out of even the hidden
+      # log, which the failure summary below reads.
+      RUSTFLAGS: -Awarnings
+      CARGO_TERM_QUIET: "true"
+      # No symbol table: function names would outline the private source.
+      CARGO_PROFILE_RELEASE_STRIP: symbols
+      NPM_CONFIG_LOGLEVEL: error
+      NPM_CONFIG_AUDIT: "false"
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+
+    steps:
+      # Pull requests from forks, and Dependabot's, get no secrets. They still
+      # build both editions, without Achilles; anything that publishes must
+      # include it.
+      - name: Check for the Achilles deploy key
+        id: key
+        env:
+          ACHILLES_DEPLOY_KEY: ${{ secrets.ACHILLES_DEPLOY_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ -n "${ACHILLES_DEPLOY_KEY}" ]]; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == pull_request ]]; then
+            echo "::warning title=Achilles left out::This pull request can't read ACHILLES_DEPLOY_KEY (it comes from a fork, or from Dependabot), so its images are built without Achilles."
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "::error title=No Achilles deploy key::ACHILLES_DEPLOY_KEY is not set, and every published image must include Achilles."
+            exit 1
+          fi
+
+      # git and ssh for the checkouts, tar and zstd for the caches. dnf's
+      # output, nearly 300 packages long, is shown only if it fails.
+      - name: Install build dependencies
+        if: steps.key.outputs.available == 'true'
+        run: |
+          if ! dnf5 -y install --setopt=install_weak_deps=False \
+            git-core openssh-clients tar zstd file \
+            rust cargo nodejs npm gcc pkgconf-pkg-config \
+            webkit2gtk4.1-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel openssl-devel \
+            > "${RUNNER_TEMP}/dnf.log" 2>&1; then
+            cat "${RUNNER_TEMP}/dnf.log"
+            exit 1
+          fi
+          rustc --version
+          echo "Node $(node --version), npm $(npm --version)"
+          rpm -q webkit2gtk4.1-devel gtk3-devel
+
+      # These stage versions are pinned by https://github.com/renovatebot/renovate
+      - name: Check out achilles.ref
+        if: steps.key.outputs.available == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: achilles.ref
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Read the Achilles pin
+        id: pin
+        if: steps.key.outputs.available == 'true'
+        run: |
+          sha=$(< achilles.ref)
+          if [[ ! "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error file=achilles.ref::achilles.ref must hold one full commit SHA of mslanden/achilles."
+            exit 1
+          fi
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out Achilles
+        if: steps.key.outputs.available == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: mslanden/achilles
+          ref: ${{ steps.pin.outputs.sha }}
+          ssh-key: ${{ secrets.ACHILLES_DEPLOY_KEY }}
+          path: achilles
+          # Remove the key once the source is here.
+          persist-credentials: false
+          show-progress: false
+
+      # Pull requests, forks' included, can restore these caches, so they hold
+      # nothing built from Achilles' source: rust-cache keeps only third-party
+      # crates' build output (it deletes Achilles' own before saving), and npm's
+      # cache only registry downloads.
+      - name: Cache Rust crates
+        if: steps.key.outputs.available == 'true'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: achilles/src-tauri -> target
+
+      - name: Cache npm downloads
+        if: steps.key.outputs.available == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm/_cacache
+          key: npm-${{ hashFiles('achilles/package-lock.json') }}
+          restore-keys: npm-
+
+      # Compiler errors quote source lines too, so a failure shows only the
+      # error headlines; build the pinned commit on Fedora 44 to see the rest.
+      - name: Build Achilles
+        if: steps.key.outputs.available == 'true'
+        working-directory: achilles
+        env:
+          PIN: ${{ steps.pin.outputs.sha }}
+        run: |
+          log="${RUNNER_TEMP}/achilles-build.log"
+          if ! { npm ci && npm run tauri:build -- --no-bundle -- --locked; } > "${log}" 2>&1; then
+            echo "::error title=Achilles did not build::Its output stays out of this public log. Build commit ${PIN} of mslanden/achilles on Fedora 44 to see it."
+            grep -E '^error|^npm error|error TS[0-9]+:|system library' "${log}" | cut -c1-300 | head -n 40 || true
+            exit 1
+          fi
+          echo "Built ${PIN} in ${SECONDS}s"
+
+      - name: Package the binary and its icon
+        if: steps.key.outputs.available == 'true'
+        working-directory: achilles
+        run: |
+          # Tauri builds dist/ into the binary, so a source map there would
+          # publish Achilles' frontend source with the image.
+          if [[ -n "$(find dist -name '*.map' -print -quit)" ]] || grep -rqE '[#@] sourceMappingURL=' dist; then
+            echo "::error title=Source maps::Achilles' frontend build made source maps, which would put its source in the binary."
+            exit 1
+          fi
+          out="${GITHUB_WORKSPACE}/achilles-out"
+          install -Dm755 src-tauri/target/release/achilles "${out}/achilles"
+          install -Dm644 src-tauri/icons/128x128@2x.png "${out}/com.stiloria.desktop.png"
+          file -b "${out}/achilles" | grep -q '^ELF 64-bit LSB pie executable, x86-64'
+          # The image installs it as hicolor's 256x256 icon.
+          file -b "${out}/com.stiloria.desktop.png" | grep -q '^PNG image data, 256 x 256,'
+          du -h "${out}/achilles"
+          sha256sum "${out}"/*
+
+      - name: Upload the binary and its icon
+        if: steps.key.outputs.available == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: achilles
+          path: achilles-out/
+          if-no-files-found: error
+          retention-days: 7
+
   build_push:
     name: Build and push image (${{ matrix.edition }})
+    needs: achilles
     runs-on: ubuntu-26.04
 
     strategy:
@@ -76,6 +240,22 @@ jobs:
           # Lowercase the image uri https://github.com/macbre/push-to-ghcr/issues/12
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+      # The Containerfile copies achilles/ into the build: the binary and icon
+      # from the achilles job, or, for a pull request without the deploy key, a
+      # note that build.sh should leave Achilles out.
+      - name: Download Achilles
+        if: needs.achilles.outputs.built == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: achilles
+          path: achilles
+
+      - name: Leave Achilles out
+        if: needs.achilles.outputs.built != 'true' && github.event_name == 'pull_request'
+        run: |
+          mkdir -p achilles
+          echo "this pull request can't read ACHILLES_DEPLOY_KEY" > achilles/skipped
 
       # This actually builds the container image
       - name: Build Image
