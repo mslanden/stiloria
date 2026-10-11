@@ -1,0 +1,40 @@
+#!/usr/bin/bash
+# Starts PrismML's llama-server (/usr/lib/stiloria/llama.cpp) for
+# stiloria-voice-model.service and stiloria-bonsai.service, passing every
+# argument on, except that "-c auto" becomes a context size that fits the GPU:
+# 65536 tokens with 16 GB of GPU memory or more, 32768 below that.
+set -euo pipefail
+
+# The largest GPU's memory in MiB: amdgpu reports it in sysfs (an integrated
+# GPU reports only its small carve-out), nvidia-smi for NVIDIA cards.
+gpu_memory_mib() {
+    local largest=0 file mib
+    for file in /sys/class/drm/card*/device/mem_info_vram_total; do
+        [[ -r $file ]] || continue
+        mib=$(($(<"$file") / 1048576))
+        ((mib > largest)) && largest=$mib
+    done
+    if command -v nvidia-smi >/dev/null; then
+        while read -r mib; do
+            [[ $mib =~ ^[0-9]+$ ]] && ((mib > largest)) && largest=$mib
+        done < <(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null || true)
+    fi
+    echo "$largest"
+}
+
+args=()
+while (($#)); do
+    if [[ $1 == -c || $1 == --ctx-size ]] && [[ ${2:-} == auto ]]; then
+        mib=$(gpu_memory_mib)
+        # A card sold as 16 GB reports a little less (15.9 GiB is typical),
+        # so the line is drawn at 15 GiB.
+        if ((mib >= 15 * 1024)); then context=65536; else context=32768; fi
+        echo "GPU memory: ${mib} MiB, so a context of $context tokens"
+        args+=("$1" "$context")
+        shift 2
+    else
+        args+=("$1")
+        shift
+    fi
+done
+exec /usr/lib/stiloria/llama.cpp/llama-server "${args[@]}"

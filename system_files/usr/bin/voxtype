@@ -1,0 +1,7 @@
+#!/usr/bin/sh
+# voxtype publishes one build per CPU level (build.sh installs two in
+# /usr/lib/voxtype). Run the AVX2 build on CPUs from 2013 on, else the baseline.
+if grep -q -m1 -w avx2 /proc/cpuinfo && grep -q -m1 -w fma /proc/cpuinfo && grep -q -m1 -w f16c /proc/cpuinfo; then
+    exec /usr/lib/voxtype/voxtype-avx2 "$@"
+fi
+exec /usr/lib/voxtype/voxtype-baseline "$@"

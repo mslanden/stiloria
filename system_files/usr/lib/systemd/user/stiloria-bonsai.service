@@ -1,0 +1,22 @@
+# Achilles starts this on demand (systemctl --user start); it has no [Install]
+# section, so it never starts at login on its own.
+[Unit]
+Description=Main model for Achilles (Ternary Bonsai 2 27B, 127.0.0.1:8085)
+
+[Service]
+Type=exec
+# Fails the start, telling the user what to install, if a model file is missing.
+ExecStartPre=/usr/bin/stiloria-models check bonsai
+# "-c auto": 65536 tokens on GPUs with 16 GB or more, else 32768; see
+# /usr/libexec/stiloria-llama-server.
+ExecStart=/usr/libexec/stiloria-llama-server \
+    -m %D/stiloria/models/Ternary-Bonsai-2-27B-PQ2_0.gguf \
+    --mmproj %D/stiloria/models/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf \
+    --host 127.0.0.1 --port 8085 --alias bonsai-2-27b \
+    -ngl 999 -fa on -c auto -np 1 -ctk q8_0 -ctv q8_0 \
+    --image-min-tokens 1024 \
+    --spec-type ngram-simple --spec-ngram-simple-size-n 8 --spec-ngram-simple-size-m 24 \
+    --jinja --temp 1.0 --top-p 0.95 --top-k 20 --reasoning-budget 512
+# Restart after a crash; an error exit (say, not enough GPU memory) stays failed.
+Restart=on-abnormal
+RestartSec=5
