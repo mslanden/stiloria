@@ -115,6 +115,60 @@ chmod 0600 "$initramfs"
 modules "$initramfs" | diff /tmp/initramfs-modules.before -
 lsinitrd -f usr/share/plymouth/themes/spinner/watermark.png "$initramfs" | cmp - /usr/share/stiloria/plymouth-watermark.png
 
+### Local AI services
+# Achilles, the voice assistant, talks to these over HTTP on 127.0.0.1 and
+# starts them on demand with `systemctl --user start` (the units are in
+# system_files/usr/lib/systemd/user and none is enabled, so nothing runs at
+# login). The programs are part of the image; the models are gigabytes, so each
+# user downloads them into their home with `stiloria-models install`.
+#
+# Both language models run on llama-server from PrismML's llama.cpp fork, since
+# upstream llama.cpp can't load their PQ2_0 format. The Vulkan build runs on
+# AMD (Mesa) and NVIDIA cards alike. Use prism-b10772 or newer: in the Vulkan
+# build of prism-b10683, PQ2_0 weights stay on the CPU (fixed by PrismML's
+# PR #238), at a few tokens a second.
+llama_release=prism-b10772-e8fd209
+llama_sha256=bf0849e2ad6ca39aed5338ab6072ea10f83c9ab28e30e1f34b553b87550af16e
+curl -fsSL --retry 3 -o /tmp/llama.tar.gz \
+    "https://github.com/PrismML-Eng/llama.cpp/releases/download/$llama_release/llama-$llama_release-bin-ubuntu-vulkan-x64.tar.gz"
+echo "$llama_sha256  /tmp/llama.tar.gz" | sha256sum -c -
+install -d -m755 /usr/lib/stiloria/llama.cpp
+tar -xzf /tmp/llama.tar.gz -C /usr/lib/stiloria/llama.cpp --strip-components=1 --no-same-owner
+rm /tmp/llama.tar.gz
+# The programs run as the user: check them as nobody, not root.
+as_user() { setpriv --reuid=nobody --regid=nobody --clear-groups "$@"; }
+# It is built for Ubuntu: fail here if Fedora lacks a library it needs.
+test -z "$(ldd /usr/lib/stiloria/llama.cpp/llama-server /usr/lib/stiloria/llama.cpp/lib*.so | grep 'not found')"
+llama_version=$(as_user /usr/lib/stiloria/llama.cpp/llama-server --version 2>&1)
+grep -q "commit ${llama_release##*-}" <<< "$llama_version"
+
+# Speech to text: voxtype's release builds for x86-64 CPUs with AVX2, and a
+# baseline build for older ones; /usr/bin/voxtype picks one. (Its RPM bundles
+# every GPU variant as well and is 375 MB.)
+voxtype_version=1.1.0
+install -d -m755 /usr/lib/voxtype
+for build in avx2:e7d5de68cc8fc610c3c961c47f879451db9bee4a2df152e9a66f1078072e7f28 \
+    baseline:1c9d78b4f6805e4f12ba3670949d3c22788269bdbc54215afffa42cafd0b4a7a; do
+    binary=/usr/lib/voxtype/voxtype-${build%%:*}
+    curl -fsSL --retry 3 -o "$binary" \
+        "https://github.com/peteonrails/voxtype/releases/download/v$voxtype_version/voxtype-$voxtype_version-linux-x86_64-${build%%:*}"
+    echo "${build#*:}  $binary" | sha256sum -c -
+    chmod 755 "$binary"
+    test -z "$(ldd "$binary" | grep 'not found')"
+    test "$(as_user "$binary" --version)" = "voxtype $voxtype_version"
+done
+test "$(as_user voxtype --version)" = "voxtype $voxtype_version"
+
+# Text to speech: Kokoro on the CPU, so the GPU stays with games and the
+# language models. Its server (system_files/usr/lib/stiloria/kokoro) turns text
+# into phonemes with espeak-ng, and stiloria-models installs the onnxruntime
+# and numpy wheels pinned in requirements.txt, which are built for Python 3.14:
+# when Bazzite moves to a newer Python, update them, and this check.
+rpm -q espeak-ng || dnf5 install -y espeak-ng
+test -e /usr/lib64/libespeak-ng.so.1
+python3 -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+as_user stiloria-models --help > /dev/null
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.

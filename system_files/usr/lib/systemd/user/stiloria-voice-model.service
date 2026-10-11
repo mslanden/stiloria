@@ -1,0 +1,17 @@
+# Achilles starts this on demand (systemctl --user start); it has no [Install]
+# section, so it never starts at login on its own.
+[Unit]
+Description=Voice-command model for Achilles (Ternary Bonsai 8B, 127.0.0.1:8087)
+
+[Service]
+Type=exec
+# Fails the start, telling the user what to install, if the model is missing.
+ExecStartPre=/usr/bin/stiloria-models check voice
+ExecStart=/usr/libexec/stiloria-llama-server \
+    -m %D/stiloria/models/Ternary-Bonsai-8B-PQ2_0.gguf \
+    --host 127.0.0.1 --port 8087 --alias ternary-bonsai-8b \
+    -ngl 999 -fa on -c 8192 -np 1 -ctk q8_0 -ctv q8_0 \
+    --jinja --temp 0.7 --top-p 0.8 --top-k 20
+# Restart after a crash; an error exit (say, not enough GPU memory) stays failed.
+Restart=on-abnormal
+RestartSec=5

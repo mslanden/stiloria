@@ -1,0 +1,16 @@
+# Achilles starts this on demand (systemctl --user start); it has no [Install]
+# section, so it never starts at login on its own.
+[Unit]
+Description=Kokoro text-to-speech for Achilles (CPU only, 127.0.0.1:17833)
+
+[Service]
+Type=exec
+# Fails the start, telling the user what to install, if the model or its
+# Python runtime is missing.
+ExecStartPre=/usr/bin/stiloria-models check tts
+ExecStart=%D/stiloria/kokoro-venv/bin/python /usr/lib/stiloria/kokoro/server.py
+# Also set in server.py: onnxruntime from PyPI otherwise reports usage to Microsoft.
+Environment=ORT_DISABLE_TELEMETRY=1
+# Restart after a crash; an error exit stays failed.
+Restart=on-abnormal
+RestartSec=3

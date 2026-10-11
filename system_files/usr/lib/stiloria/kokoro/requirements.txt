@@ -1,0 +1,9 @@
+# The Python packages server.py needs, installed by `stiloria-models install tts`
+# into ~/.local/share/stiloria/kokoro-venv with pip --require-hashes --no-deps.
+# Wheels for the image's Python 3.14 (build.sh checks the version). onnxruntime
+# lists flatbuffers, packaging and protobuf as dependencies, but running a model
+# on the CPU doesn't import them.
+numpy==2.5.4 \
+    --hash=sha256:d549420b8858885cea8838a727842249218b9c1da24dd517e25c9c7a948310a3
+onnxruntime==1.31.0 \
+    --hash=sha256:e4efa4a1a0bb0b5173c6a3292c181d518b8323f9d56e978635d0c09d38c94d1a

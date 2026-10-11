@@ -1,0 +1,261 @@
+#!/usr/bin/bash
+# Downloads the models for Achilles' local AI services into the user's home.
+# The programs that run them are in the image (build.sh, "Local AI services").
+set -euo pipefail
+
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+models=$data/stiloria/models
+venv=$data/stiloria/kokoro-venv
+requirements=/usr/lib/stiloria/kokoro/requirements.txt
+
+# component|folder|file|bytes|sha256|url. Hugging Face files are pinned to a
+# commit of their repository; the checksums are the ones Hugging Face and
+# GitHub publish for these files.
+bonsai_8b=https://huggingface.co/prism-ml/Ternary-Bonsai-8B-gguf/resolve/c2aefbeb4b24469cd11579c3384b990404c17a30
+bonsai_27b=https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf/resolve/b072e1d3b35a0a630cece372c2127528e0994386
+whisper=https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1
+kokoro=https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1
+files=(
+    "voice|$models|Ternary-Bonsai-8B-PQ2_0.gguf|2182184672|1376f942aa90e60f7b570c1d81b3916fea1315ff85aa1c4d19006af68fb4b922|$bonsai_8b"
+    "bonsai|$models|Ternary-Bonsai-2-27B-PQ2_0.gguf|7206168928|3907dc1658db1f78a9826bf8d5bcb8dc65db0d466388937af57f2294fae62ec1|$bonsai_27b"
+    "bonsai|$models|Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf|629246976|6807ede61d570bb86ba34b756a0fa109edc33668604de867c6ea6d8f1d631903|$bonsai_27b"
+    "speech|$data/voxtype/models|ggml-base.en.bin|147964211|a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002|$whisper"
+    "tts|$models|kokoro-v1.0.onnx|325505369|beb0d1848dee9a49da392cc3df26958d46cfa35d321edf434f52949153f0df3a|$kokoro"
+    "tts|$models|voices-v1.0.bin|28214398|bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d|$kokoro"
+)
+components=(voice bonsai speech tts)
+declare -A describe=(
+    [voice]="Voice commands: Ternary Bonsai 8B, for stiloria-voice-model.service"
+    [bonsai]="Main model: Ternary Bonsai 2 27B and its image encoder, for stiloria-bonsai.service"
+    [speech]="Speech to text: Whisper base.en, for voxtype"
+    [tts]="Text to speech: Kokoro 82M and its Python runtime, for kokoro-tts.service"
+)
+
+usage() {
+    cat <<EOF
+Usage: stiloria-models status
+       stiloria-models install voice|bonsai|speech|tts|all ...
+       stiloria-models check voice|bonsai|speech|tts
+
+Downloads the models Achilles' local AI services need into your home folder.
+No account or token is needed. Downloads show their progress, resume where
+they stopped, and are checked against SHA-256 sums pinned in this script;
+running install again only fetches what is missing.
+
+  voice   $(human "$(component_bytes voice)")  ${describe[voice]}
+  bonsai  $(human "$(component_bytes bonsai)")  ${describe[bonsai]}
+  speech  $(human "$(component_bytes speech)")  ${describe[speech]}
+  tts     $(human "$(component_bytes tts)")  ${describe[tts]}
+          (onnxruntime and numpy, about 40 MiB more)
+  all     all four
+
+Models go to ${models/#$HOME/\~}, Whisper's to ${data/#$HOME/\~}/voxtype/models.
+check exits with status 1 and says what to install if a component is missing;
+the services run it before they start.
+EOF
+}
+
+die() {
+    echo "stiloria-models: $*" >&2
+    exit 1
+}
+
+human() {
+    numfmt --to=iec-i --suffix=B --format=%.1f --round=nearest "$1" | sed 's/\([0-9]\)\([KMGT]\)/\1 \2/'
+}
+
+# The lines of $files for one component.
+entries() {
+    local entry
+    for entry in "${files[@]}"; do
+        [[ ${entry%%|*} == "$1" ]] && echo "$entry"
+    done
+}
+
+component_bytes() {
+    local total=0 component folder name bytes rest
+    while IFS='|' read -r component folder name bytes rest; do
+        total=$((total + bytes))
+    done < <(entries "$1")
+    echo "$total"
+}
+
+size_of() {
+    stat -c %s "$1" 2>/dev/null || echo 0
+}
+
+# Kokoro's Python environment works with this system's Python.
+runtime_ready() {
+    [[ -x $venv/bin/python ]] && ORT_DISABLE_TELEMETRY=1 "$venv/bin/python" -c 'import numpy, onnxruntime' 2>/dev/null
+}
+
+# What is missing from a component, one item per line.
+missing() {
+    local component folder name bytes sum url
+    while IFS='|' read -r component folder name bytes sum url; do
+        [[ $(size_of "$folder/$name") == "$bytes" ]] || echo "$name"
+    done < <(entries "$1")
+    if [[ $1 == tts ]] && ! runtime_ready; then
+        echo "Kokoro's Python runtime"
+    fi
+}
+
+check() {
+    local absent
+    absent=$(missing "$1")
+    if [[ -n $absent ]]; then
+        die "$1 is not installed (missing: $(paste -sd, - <<<"$absent" | sed 's/,/, /g')). Run: stiloria-models install $1"
+    fi
+}
+
+status() {
+    local component bytes state done_bytes folder name absent
+    printf '%-8s %-30s %s\n' Component State Contents
+    for component in "${components[@]}"; do
+        bytes=$(component_bytes "$component")
+        absent=$(missing "$component")
+        if [[ -z $absent ]]; then
+            state="installed, $(human "$bytes")"
+        else
+            done_bytes=0
+            while IFS='|' read -r _ folder name _; do
+                if [[ -f $folder/$name ]]; then
+                    done_bytes=$((done_bytes + $(size_of "$folder/$name")))
+                else
+                    done_bytes=$((done_bytes + $(size_of "$folder/$name.part")))
+                fi
+            done < <(entries "$component")
+            if ((done_bytes == 0)); then
+                state="not installed, $(human "$bytes")"
+            elif ((done_bytes < bytes)); then
+                state="partly: $(human "$done_bytes") of $(human "$bytes")"
+            else
+                state="needs its Python runtime"
+            fi
+        fi
+        printf '%-8s %-30s %s\n' "$component" "$state" "${describe[$component]}"
+    done
+    echo
+    if [[ -d $models ]]; then
+        echo "Models: ${models/#$HOME/\~} ($(human "$(du -sb "$models" | cut -f1)") used)"
+    fi
+    if [[ -d $venv ]]; then
+        echo "Kokoro's Python runtime: ${venv/#$HOME/\~} ($(human "$(du -sb "$venv" | cut -f1)") used)"
+    fi
+}
+
+# Download one file to folder/name through name.part, resuming a partial
+# download, and move it into place only once its checksum matches.
+fetch() {
+    local folder=$1 name=$2 bytes=$3 sum=$4 url=$5
+    local target=$folder/$name part=$folder/$name.part have attempt status free actual
+    if [[ $(size_of "$target") == "$bytes" ]]; then
+        echo "$name: already downloaded"
+        return
+    fi
+    mkdir -p "$folder"
+    have=$(size_of "$part")
+    ((have <= bytes)) || { rm -f "$part"; have=0; }
+    free=$(df --output=avail -B1 "$folder" | tail -1)
+    ((free > bytes - have + 100 * 1024 * 1024)) ||
+        die "not enough free space in $folder for $name: it needs $(human $((bytes - have))), $(human "$free") is free"
+    for attempt in 1 2 3 4 5; do
+        have=$(size_of "$part")
+        ((have < bytes)) || break
+        if ((have > 0)); then
+            echo "$name: resuming at $(human "$have") of $(human "$bytes")"
+        else
+            echo "$name: downloading $(human "$bytes")"
+        fi
+        status=0
+        curl --fail --location --continue-at - --progress-bar --connect-timeout 30 \
+            --speed-limit 1024 --speed-time 60 --output "$part" "$url/$name" || status=$?
+        ((status == 0)) && continue
+        # 33: the server ignored the byte range, so the partial file is useless.
+        ((status == 33)) && rm -f "$part"
+        ((attempt < 5)) || die "downloading $name failed (curl exit status $status). Run the same command again to resume."
+        echo "$name: the download stopped (curl exit status $status), retrying in 10 seconds"
+        sleep 10
+    done
+    echo "$name: checking its SHA-256"
+    actual=$(sha256sum "$part" | cut -d' ' -f1)
+    if [[ $actual != "$sum" ]]; then
+        rm -f "$part"
+        die "$name doesn't match its checksum (got $actual, expected $sum), so it was deleted. Run the same command again to download it afresh."
+    fi
+    mv -f "$part" "$target"
+}
+
+# Kokoro's Python environment: onnxruntime and numpy wheels, hash-checked.
+install_runtime() {
+    if runtime_ready && cmp -s "$requirements" "$venv/.stiloria-requirements"; then
+        echo "Kokoro's Python runtime: already installed"
+        return
+    fi
+    echo "Kokoro's Python runtime: installing onnxruntime and numpy into ${venv/#$HOME/\~}"
+    rm -rf "$venv"
+    python3 -m venv "$venv"
+    if ! "$venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
+        --no-deps --only-binary=:all: --require-hashes -r "$requirements"; then
+        rm -rf "$venv"
+        die "installing Kokoro's Python runtime failed. Run the same command again to retry."
+    fi
+    cp "$requirements" "$venv/.stiloria-requirements"
+}
+
+install() {
+    local component=$1 folder name bytes sum url
+    echo "== $component: ${describe[$component]}"
+    while IFS='|' read -r _ folder name bytes sum url; do
+        fetch "$folder" "$name" "$bytes" "$sum" "$url"
+    done < <(entries "$component")
+    [[ $component == tts ]] && install_runtime
+    case $component in
+        voice) echo "Ready: systemctl --user start stiloria-voice-model" ;;
+        bonsai) echo "Ready: systemctl --user start stiloria-bonsai" ;;
+        speech) echo "Ready: voxtype finds it in ${data/#$HOME/\~}/voxtype/models" ;;
+        tts) echo "Ready: systemctl --user start kokoro-tts" ;;
+    esac
+}
+
+valid() {
+    [[ " ${components[*]} " == *" $1 "* ]] || die "unknown component '$1' (choose from: ${components[*]}, all)"
+}
+
+case ${1:-} in
+    status)
+        status
+        ;;
+    check)
+        [[ $# == 2 ]] || { usage >&2; exit 2; }
+        valid "$2"
+        check "$2"
+        ;;
+    install)
+        shift
+        (($#)) || { usage >&2; exit 2; }
+        [[ $EUID != 0 ]] || die "run this as yourself, without sudo: models go into your own home folder"
+        selected=()
+        for component in "$@"; do
+            if [[ $component == all ]]; then
+                selected+=("${components[@]}")
+            else
+                valid "$component"
+                selected+=("$component")
+            fi
+        done
+        mkdir -p "$data/stiloria"
+        exec {lock}>"$data/stiloria/.stiloria-models.lock"
+        flock -n "$lock" || die "another stiloria-models install is running"
+        for component in "${selected[@]}"; do
+            install "$component"
+        done
+        ;;
+    -h | --help | help)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac
