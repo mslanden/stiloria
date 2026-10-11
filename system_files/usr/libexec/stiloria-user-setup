@@ -1,0 +1,24 @@
+#!/usr/bin/bash
+# Run at each Plasma login. Applies Stiloria's look once per user and per
+# VERSION, so someone switching from Bazzite gets the Stiloria wallpaper, and a
+# wallpaper they pick afterwards is never overwritten. Raise VERSION to apply a
+# new default to everyone once more.
+VERSION=1
+state="${XDG_STATE_HOME:-$HOME/.local/state}/stiloria/user-setup"
+if [[ -f $state ]] && (($(cat "$state") >= VERSION)); then
+    exit 0
+fi
+
+wallpaper=/usr/share/wallpapers/Stiloria/contents/images/3840x2160.jpg
+# Plasma may still be starting when autostart runs; wait for it a little.
+for _ in $(seq 1 20); do
+    plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 && applied=1 && break
+    sleep 3
+done
+# Not applied (Plasma never answered): leave the state alone and try next login.
+[[ -n ${applied:-} ]] || exit 0
+kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$wallpaper"
+kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key PreviewImage "file://$wallpaper"
+
+mkdir -p "$(dirname "$state")"
+echo "$VERSION" > "$state"

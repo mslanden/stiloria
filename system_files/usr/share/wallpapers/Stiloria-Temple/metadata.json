@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Id": "Stiloria-Temple",
+        "Name": "Temple at Night",
+        "License": "CC-BY-SA-4.0",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ]
+    }
+}

@@ -1,0 +1,12 @@
+# Apps Stiloria installs from Flathub on top of Bazzite's own set (Firefox,
+# Gwenview, Okular, Haruna, ...). Each app is offered once per machine: removing
+# one keeps it removed, and adding a line here installs it on the next boot.
+com.discordapp.Discord
+# "Photos": a gallery of everything in Pictures, like the Windows Photos app.
+org.kde.koko
+# Epic, GOG and Amazon games.
+com.heroicgameslauncher.hgl
+# Recording and streaming.
+com.obsproject.Studio
+# Windows programs that aren't games.
+com.usebottles.bottles

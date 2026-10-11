@@ -22,6 +22,28 @@ printf '%s\n' 'docker:' \
     '  ghcr.io/mslanden/stiloria-nvidia:' '    use-sigstore-attachments: true' \
     > /etc/containers/registries.d/stiloria.yaml
 
+### Branding
+# The name shown in the boot menu, fastfetch and system info. Bazzite's NAME and
+# ID stay, as does /usr/share/ublue-os/image-info.json: Bazzite's updater,
+# hardware setup and other tools read those. The About page is
+# system_files/etc/xdg/kcm-about-distrorc.
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Stiloria"/' /usr/lib/os-release
+
+# New accounts get Stiloria's wallpaper through the Steam-style Plasma themes
+# Bazzite uses, and the lock screen shows it too; existing accounts get it once
+# from stiloria-user-setup. If Bazzite moves these, fail the build rather than
+# quietly keep its wallpaper.
+wallpaper=/usr/share/wallpapers/Stiloria/contents/images/3840x2160.jpg
+test -f "$wallpaper"
+for file in /usr/share/plasma/look-and-feel/com.valve.{vapor,vgui}.desktop/contents/plasmoidsetupscripts/org.kde.plasma.folder.js \
+    /etc/xdg/kscreenlockerrc; do
+    sed -i "s|/usr/share/wallpapers/convergence.jxl|$wallpaper|g" "$file"
+    grep -q "$wallpaper" "$file"
+done
+
+### Recommended apps: system_files/usr/share/stiloria/flatpaks
+systemctl enable stiloria-flatpak-manager.service
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.

@@ -1,0 +1,14 @@
+[Unit]
+Description=Install Stiloria's recommended apps
+Wants=network-online.target
+After=network-online.target bazzite-flatpak-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/stiloria-flatpak-manager
+# No network yet, or Flathub briefly down: try again in a few minutes.
+Restart=on-failure
+RestartSec=5min
+
+[Install]
+WantedBy=multi-user.target

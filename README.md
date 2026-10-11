@@ -1,3 +1,5 @@
+<p align="center"><img src="branding/stiloria-logo.svg" alt="Stiloria logo: a navy and gold Corinthian helmet" width="160"></p>
+
 # Stiloria
 
 A Linux for gaming and AI, built on [Bazzite](https://bazzite.gg) with the KDE Plasma desktop. Stiloria is the home of **Achilles**, a local voice assistant for controlling the PC.
@@ -26,6 +28,12 @@ Older NVIDIA cards (GTX 10-series and earlier) aren't supported yet. Switching a
 ## Signed updates
 
 Every build is signed with this repo's key (`cosign.pub` is its public half). Stiloria carries a container policy that accepts a `stiloria` or `stiloria-nvidia` image only with that signature, so once a machine runs Stiloria, every update it downloads is verified and anything else is rejected. The first switch from Bazzite can't check this yet, because Bazzite doesn't know the key; everything after it is checked.
+
+## What Stiloria adds to Bazzite
+
+- **Name and logo**: "Stiloria" in the boot menu, system info and Settings → About this System, with the helmet logo.
+- **Wallpapers**: six Stiloria wallpapers in the wallpaper picker (Stiloria, Temple at Night, Aegean Dawn, Marble Mind, Troy at Dusk and Stiloria Minimal), made with Qwen Image 2.1 on a local GPU except Stiloria Minimal, which is drawn from the vector logo. New accounts start with the default one, and existing accounts get it once at their first login on Stiloria (`/usr/libexec/stiloria-user-setup`); a wallpaper picked afterwards is never overwritten.
+- **Recommended apps** from Flathub, on top of Bazzite's own (Firefox, Gwenview, Okular, Haruna, …): Discord, Photos (a gallery like the Windows Photos app), Heroic for Epic/GOG/Amazon games, OBS Studio and Bottles. They install on the first boot with a network connection. Each app is offered once per machine, so one you remove stays removed; adding an ID to `system_files/usr/share/stiloria/flatpaks` installs it everywhere on the next boot.
 
 ## Repo layout
 

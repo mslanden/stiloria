@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Id": "Stiloria",
+        "Name": "Stiloria",
+        "License": "CC-BY-SA-4.0",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ]
+    }
+}
