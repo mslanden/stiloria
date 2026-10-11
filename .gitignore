@@ -4,3 +4,7 @@ output
 _build-*/**
 *_chunkah_*
 *_rpm-ostree_*
+# Achilles' binary and icon for the image build, from the workflow's achilles
+# job (see README). Ignored, so `just build` still sees a clean tree and labels
+# the image.
+/achilles/

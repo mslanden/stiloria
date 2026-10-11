@@ -189,3 +189,65 @@ dnf5 install -y tmux
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
+
+### Achilles, Stiloria's desktop assistant (see "Achilles" in the README)
+# The workflow's achilles job builds it from the private mslanden/achilles, at
+# the commit in achilles.ref, on Fedora 44 like this image, and hands over only
+# the binary and its icon. Pull requests that can't read the deploy key (from
+# forks, or Dependabot) build without it, and achilles/skipped says so.
+if [[ -f /ctx/achilles/skipped ]]; then
+    echo "Building without Achilles: $(< /ctx/achilles/skipped)"
+elif [[ ! -f /ctx/achilles/achilles ]]; then
+    echo "achilles/ has no Achilles binary: see \"Achilles\" in the README" >&2
+    exit 1
+else
+    install -Dm755 /ctx/achilles/achilles /usr/bin/achilles
+    ln -s achilles /usr/bin/stiloria
+    install -Dm644 /ctx/achilles/com.stiloria.desktop.png /usr/share/icons/hicolor/256x256/apps/com.stiloria.desktop.png
+    # GTK trusts hicolor's icon cache unless it is older than the theme folder,
+    # and on an installed system every file has the same timestamp, so the
+    # cache must list the icon. RPM triggers refresh it; nothing does here.
+    gtk-update-icon-cache -f /usr/share/icons/hicolor
+    grep -q com.stiloria.desktop /usr/share/icons/hicolor/icon-theme.cache
+
+    cat > /usr/share/applications/com.stiloria.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Achilles
+Comment=Achilles desktop assistant
+Exec=achilles
+Icon=com.stiloria.desktop
+Terminal=false
+Categories=Utility;
+StartupWMClass=achilles
+EOF
+    # Start at login without a window, so push-to-talk works right away. Builds
+    # of Achilles from before --hidden ignore it and open their window. Only in
+    # Plasma: in Game Mode a window would cover Steam.
+    cat > /etc/xdg/autostart/achilles.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Achilles
+Comment=Starts Achilles in the background, for push-to-talk
+Exec=achilles --hidden
+Icon=com.stiloria.desktop
+Terminal=false
+OnlyShowIn=KDE;
+EOF
+    desktop-file-validate /usr/share/applications/com.stiloria.desktop /etc/xdg/autostart/achilles.desktop
+
+    # Achilles was linked against Fedora 44's libraries, not this image's: fail
+    # if Bazzite lacks one, or has an older one than it needs.
+    ldd /usr/bin/achilles > /tmp/achilles-libs 2>&1
+    if grep 'not found' /tmp/achilles-libs; then
+        echo "Achilles needs libraries this image lacks (above)" >&2
+        exit 1
+    fi
+    # And it must run. With no Achilles running, a push-to-talk press says so
+    # and exits 1; that loads every library it links, without a display.
+    status=0
+    out=$(XDG_RUNTIME_DIR="$(mktemp -d)" timeout 60 achilles voice start 2>&1) || status=$?
+    echo "$out"
+    test "$status" = 1
+    grep -q "Achilles isn't running" <<< "$out"
+fi
