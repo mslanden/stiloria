@@ -1,4 +1,4 @@
-<p align="center"><img src="branding/stiloria-logo.svg" alt="Stiloria logo: a navy and gold Corinthian helmet" width="160"></p>
+<p align="center"><img src="branding/stiloria-logo.svg" alt="Stiloria logo: a navy line-art Corinthian helmet with a gold accent" width="160"></p>
 
 # Stiloria
 
