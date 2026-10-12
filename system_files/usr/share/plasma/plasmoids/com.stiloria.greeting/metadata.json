@@ -1,0 +1,19 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ],
+        "Category": "Date and Time",
+        "Description": "Greets you by name, with the date, the time and how to talk to Achilles",
+        "Icon": "stiloria-start",
+        "Id": "com.stiloria.greeting",
+        "License": "Apache-2.0",
+        "Name": "Stiloria Greeting",
+        "Version": "1.0",
+        "Website": "https://github.com/mslanden/stiloria"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

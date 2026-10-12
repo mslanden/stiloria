@@ -228,6 +228,38 @@ test -e /usr/lib64/libespeak-ng.so.1
 python3 -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
 as_user stiloria-models --help > /dev/null
 
+### Desktop greeting
+# The greeting sets the date in Instrument Sans and "Good evening, Marcelino."
+# in Instrument Serif, which ship with the Porcelain look above; fail if
+# fontconfig picks another font for a face it uses.
+test "$(fc-match -f '%{file}' 'Instrument Serif')" = /usr/share/fonts/instrument-serif/InstrumentSerif-Regular.ttf
+test "$(fc-match -f '%{file}' 'Instrument Serif:italic')" = /usr/share/fonts/instrument-serif/InstrumentSerif-Italic.ttf
+test "$(fc-match -f '%{family}' 'Instrument Sans:semibold')" = "Instrument Sans"
+
+# The greeting at the top left of the desktop is a Plasma widget, Stiloria
+# Greeting (system_files/usr/share/plasma/plasmoids/com.stiloria.greeting).
+# Stiloria Day and Night's desktop layout adds it, and stiloria-user-setup adds
+# it once to existing desktops.
+applet=/usr/share/plasma/plasmoids/com.stiloria.greeting
+jq -e '.KPlugin.Id == "com.stiloria.greeting"' "$applet/metadata.json" > /dev/null
+out=$(kpackagetool6 --type Plasma/Applet --show com.stiloria.greeting)
+grep -q "Path *: $applet/" <<< "$out"
+# And Plasma must load it. plasmawindowed runs it off screen, as nobody, for 10
+# seconds: any message about its files (an import Plasma dropped, a property
+# it renamed) fails the build, as does plasmawindowed quitting early.
+home=$(mktemp -d)
+chown nobody: "$home"
+status=0
+as_user env HOME="$home" XDG_RUNTIME_DIR="$home" LANG=C.UTF-8 QT_QPA_PLATFORM=offscreen QT_FORCE_STDERR_LOGGING=1 \
+    dbus-run-session -- timeout 10 plasmawindowed com.stiloria.greeting > /tmp/greeting.log 2>&1 || status=$?
+# Services D-Bus started for it outlive the session.
+pkill -u nobody || true
+if [[ $status != 124 ]] || grep -E "plasmoids/com.stiloria.greeting|error when loading applet" /tmp/greeting.log; then
+    cat /tmp/greeting.log
+    echo "Stiloria Greeting didn't load (plasmawindowed: $status, 124 means it ran)" >&2
+    exit 1
+fi
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
