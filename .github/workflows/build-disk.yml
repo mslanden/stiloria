@@ -133,7 +133,7 @@ jobs:
       # Uploaded unzipped, so the ISO downloads as an .iso file. These are run
       # artifacts only: a GitHub release asset can't be over 2 GiB.
       - name: Upload ISO
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: upload/${{ env.ISO_NAME }}
           archive: false
@@ -141,7 +141,7 @@ jobs:
           retention-days: 30
 
       - name: Upload checksum
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           path: upload/${{ env.ISO_NAME }}-CHECKSUM
           archive: false
