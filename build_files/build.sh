@@ -28,6 +28,10 @@ printf '%s\n' 'docker:' \
 # hardware setup and other tools read those. The About page is
 # system_files/etc/xdg/kcm-about-distrorc.
 sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Stiloria"/' /usr/lib/os-release
+# The computer's name until someone sets one (shown in the terminal prompt as
+# user@stiloria). A system that already has a name keeps it.
+sed -i 's/^DEFAULT_HOSTNAME=.*/DEFAULT_HOSTNAME="stiloria"/' /usr/lib/os-release
+grep -qx 'DEFAULT_HOSTNAME="stiloria"' /usr/lib/os-release
 
 # New accounts get Stiloria's wallpaper through the Steam-style Plasma themes
 # Bazzite uses, and the lock screen shows it too; existing accounts get it once
