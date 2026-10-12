@@ -1,0 +1,10 @@
+[Desktop Entry]
+# The live session exists to install Stiloria, so open the installer at
+# login. Closed, it is still on the desktop as "Install to Hard Drive".
+Type=Application
+Name=Install Stiloria
+Exec=liveinst
+Icon=org.fedoraproject.AnacondaInstaller
+Terminal=false
+NoDisplay=true
+X-KDE-autostart-phase=2

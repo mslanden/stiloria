@@ -10,12 +10,21 @@ Stiloria is an image-based (bootc) system: this repo is the recipe, and GitHub A
 
 Pick the edition for your graphics card:
 
-| GPU | Bazzite edition to install | Stiloria image |
-| --- | --- | --- |
-| AMD or Intel | Bazzite, KDE | `ghcr.io/mslanden/stiloria` |
-| NVIDIA RTX, or GTX 16-series | Bazzite, KDE, NVIDIA | `ghcr.io/mslanden/stiloria-nvidia` |
+| GPU | Installer ISO | Stiloria image | Bazzite edition, to switch from |
+| --- | --- | --- | --- |
+| AMD or Intel | `stiloria-amd64.iso` | `ghcr.io/mslanden/stiloria` | Bazzite, KDE |
+| NVIDIA RTX, or GTX 16-series | `stiloria-nvidia-amd64.iso` | `ghcr.io/mslanden/stiloria-nvidia` | Bazzite, KDE, NVIDIA |
 
 Older NVIDIA cards (GTX 10-series and earlier) aren't supported yet. Switching an NVIDIA machine to the AMD/Intel image would remove its NVIDIA driver, so match the edition to the card.
+
+### From a USB stick
+
+1. Download the ISO for your card from the latest successful run of [Build installer ISOs](https://github.com/mslanden/stiloria/actions/workflows/build-disk.yml): open the run and scroll to **Artifacts** (downloading needs a GitHub account). The run's summary lists each ISO's SHA-256.
+2. Write it to a USB stick of 16 GB or more with [Fedora Media Writer](https://github.com/FedoraQt/MediaWriter/releases) or [balenaEtcher](https://etcher.balena.io/), or with Rufus in "DD Image" mode. This erases the stick.
+3. Start the PC from the stick, in UEFI mode; Secure Boot can stay on. The installer opens on a live Plasma desktop (closed, it's on the desktop as **Install to Hard Drive**): pick the language, the disk and your account. Everything is installed from the stick, so no network is needed.
+4. On the first restart, a blue *Perform MOK management* screen appears once. Choose **Enroll MOK**, **Continue**, **Yes**, type the password `universalblue`, then **Reboot**. This lets Secure Boot start Bazzite's kernel, which Universal Blue signs.
+
+### From Bazzite
 
 1. Install [Bazzite](https://bazzite.gg) for your GPU, as in the table.
 2. Switch to Stiloria and reboot (NVIDIA: use `stiloria-nvidia`):
@@ -27,7 +36,7 @@ Older NVIDIA cards (GTX 10-series and earlier) aren't supported yet. Switching a
 
 ## Signed updates
 
-Every build is signed with this repo's key (`cosign.pub` is its public half). Stiloria carries a container policy that accepts a `stiloria` or `stiloria-nvidia` image only with that signature, so once a machine runs Stiloria, every update it downloads is verified and anything else is rejected. The first switch from Bazzite can't check this, because Bazzite doesn't know the key. On its first boot Stiloria therefore switches itself to signed tracking of the same image (`stiloria-signed-tracking.service`), which applies at the next reboot; from then on every update is verified, and `fastfetch` shows a closed lock. It waits if an update is already staged, and leaves images other than Stiloria's alone.
+Every build is signed with this repo's key (`cosign.pub` is its public half). Stiloria carries a container policy that accepts a `stiloria` or `stiloria-nvidia` image only with that signature, so once a machine runs Stiloria, every update it downloads is verified and anything else is rejected. The installer ISOs are built only from images with a valid signature, and a machine installed from one tracks the signed image (`ostree-image-signed:docker://ghcr.io/mslanden/stiloria:latest`, or `stiloria-nvidia`) from its first boot. The first switch from Bazzite can't check this, because Bazzite doesn't know the key. On its first boot Stiloria therefore switches itself to signed tracking of the same image (`stiloria-signed-tracking.service`), which applies at the next reboot; from then on every update is verified, and `fastfetch` shows a closed lock. It waits if an update is already staged, and leaves images other than Stiloria's alone.
 
 ## What Stiloria adds to Bazzite
 
@@ -77,5 +86,7 @@ or build without it: `mkdir -p achilles && echo "local build" > achilles/skipped
 | `image-template.env` | Image name and metadata |
 | `achilles.ref` | The Achilles commit built into the image |
 | `.github/workflows/build.yml` | Daily build, publish, and signing of both editions |
+| `installer/` | The live system on the installer ISO: Stiloria plus Anaconda and the edition it installs |
+| `.github/workflows/build-disk.yml` | Builds both installer ISOs with [Titanoboa](https://github.com/ublue-os/titanoboa), on demand and for releases |
 
 Built from the [Universal Blue image template](https://github.com/ublue-os/image-template).

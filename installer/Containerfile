@@ -1,0 +1,19 @@
+# The live system on the installer USB stick: Stiloria itself, plus Anaconda
+# and a copy of the edition it installs. .github/workflows/build-disk.yml
+# builds it and turns it into an ISO with Titanoboa. Build with
+#   podman build --cap-add sys_admin --security-opt label=disable \
+#     --build-arg INSTALL_IMAGE=ghcr.io/mslanden/stiloria-nvidia:latest installer/
+# sys_admin lets podman and flatpak run inside the build.
+
+# Both ISOs boot the AMD/Intel edition: the live system runs Fedora's kernel
+# with the open nouveau driver either way, so only the installed image differs.
+ARG BASE_IMAGE=ghcr.io/mslanden/stiloria:latest
+
+FROM ${BASE_IMAGE}
+
+# The image Anaconda installs, and optionally the digest to pull for it.
+ARG INSTALL_IMAGE=ghcr.io/mslanden/stiloria:latest
+ARG INSTALL_DIGEST=""
+
+RUN --mount=type=bind,source=.,target=/src \
+    INSTALL_IMAGE="${INSTALL_IMAGE}" INSTALL_DIGEST="${INSTALL_DIGEST}" /src/build.sh
