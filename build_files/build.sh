@@ -128,6 +128,21 @@ done
 # turns to night with the desktop.
 sed -i "s|=$wallpaper\$|=/usr/share/wallpapers/Stiloria/|" /etc/xdg/kscreenlockerrc
 test "$(grep -c '=/usr/share/wallpapers/Stiloria/$' /etc/xdg/kscreenlockerrc)" = 2
+# Folders in Porcelain's stone instead of the slate accent: two icon themes,
+# Stiloria and Stiloria-Dark, that inherit Breeze and Breeze Dark and replace
+# only the accent-filled folder icons, made here from the image's own Breeze
+# (make_folder_icons.py). Stiloria Day and Night name them.
+python3 /ctx/make_folder_icons.py
+for theme in Stiloria Stiloria-Dark; do
+    for size in 32 48 64 96; do
+        grep -q 'style="fill:#' "/usr/share/icons/$theme/places/$size/folder.svg"
+        test -z "$(grep -l 'class="ColorScheme-Accent"' "/usr/share/icons/$theme/places/$size/folder.svg")"
+    done
+    test -L "/usr/share/icons/$theme/mimetypes/64/inode-directory.svg"
+    test -f "/usr/share/icons/$theme/icon-theme.cache"
+done
+grep -qx Theme=Stiloria /usr/share/plasma/look-and-feel/com.stiloria.day.desktop/contents/defaults
+grep -qx Theme=Stiloria-Dark /usr/share/plasma/look-and-feel/com.stiloria.night.desktop/contents/defaults
 # Porcelain's typefaces, Instrument Sans for the interface and Instrument Serif
 # for display text (the greeting, the boot wordmark). Fedora doesn't package
 # them, so they ship in system_files/usr/share/fonts (from github.com/google/fonts,
