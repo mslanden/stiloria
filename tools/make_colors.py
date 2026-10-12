@@ -1,13 +1,14 @@
-"""Write Stiloria's day and night KDE color schemes.
+"""Write Stiloria's day and night KDE color schemes, in the Porcelain palette.
 
 usage: python3 tools/make_colors.py   (from the repo root)
 
-Day is warm marble with navy text; night is the navy of the sky city at night
-with marble text. Both select in navy with white text; the gold edge on
-selections and the gold focus come from DecorationFocus, which Stiloria's
-Plasma style and Breeze use for focus. Every text color is checked against
-the backgrounds it is drawn on (WCAG AA, 4.5:1); the script fails otherwise.
-Groups and keys follow Plasma 6's Breeze schemes (LGPL-2.0-or-later).
+Porcelain is ivory and stone with near-black "ink" text by day, and warm black
+with ivory text at night. It has one accent, Slate, a cool stone blue: it
+fills selections (and with them the checked boxes, progress bars and sliders
+that Qt draws in the selection color) and colors links. Keyboard focus is ink,
+never the accent. Every text color is checked against the backgrounds it is
+drawn on (WCAG AA, 4.5:1); the script fails otherwise. Groups and keys follow
+Plasma 6's Breeze schemes (LGPL-2.0-or-later).
 """
 import pathlib, sys
 
@@ -32,42 +33,42 @@ def contrast(a, b):
 DAY = {
     "name": "Stiloria Day",
     "file": "StiloriaDay",
-    "comment": "Warm marble glass and navy text, for the day. Selections are navy with white text; focus is the helmet's gold.",
-    "fg": {"ForegroundNormal": "#1b2547", "ForegroundInactive": "#555b6e", "ForegroundActive": "#8a5d12",
-           "ForegroundLink": "#2c4fa3", "ForegroundVisited": "#6a4a98", "ForegroundNegative": "#a3321c",
-           "ForegroundNeutral": "#834a00", "ForegroundPositive": "#1d6640"},
-    "deco": {"DecorationFocus": "#c99a45", "DecorationHover": "#d9a74a"},
+    "comment": "Porcelain by day: ivory and stone, ink text, one slate accent.",
+    "fg": {"ForegroundNormal": "#1d1b18", "ForegroundInactive": "#6a645b", "ForegroundActive": "#3e5869",
+           "ForegroundLink": "#3e5869", "ForegroundVisited": "#6b4f7a", "ForegroundNegative": "#9b2f22",
+           "ForegroundNeutral": "#8a5a10", "ForegroundPositive": "#2f6e4a"},
+    "deco": {"DecorationFocus": "#1d1b18", "DecorationHover": "#857d71"},
     "sets": {
-        "Window": ("#f4efe6", "#ebe4d7"),
-        "View": ("#fbf8f2", "#f4efe5"),
-        "Button": ("#eee7da", "#e4dccd"),
-        "Header": ("#f1ebe1", "#e8e1d4"),
-        "Header][Inactive": ("#f6f2ea", "#eee8dd"),
-        "Tooltip": ("#fbf8f2", "#f4efe5"),
+        "Window": ("#f4f1ec", "#ebe7e0"),
+        "View": ("#fbfaf7", "#f4f1ec"),
+        "Button": ("#fbfaf7", "#f4f1ec"),
+        "Header": ("#f4f1ec", "#ebe7e0"),
+        "Header][Inactive": ("#f4f1ec", "#ebe7e0"),
+        "Tooltip": ("#fbfaf7", "#f4f1ec"),
     },
-    "complementary": {"bg": ("#1b2547", "#23315f"), "fg": "#eef2f8", "inactive": "#a9b3c7"},
-    "selection": {"bg": ("#263f80", "#2f4b91"), "fg": "#ffffff", "inactive": "#c9cfe0"},
-    "wm": {"activeBackground": "#f1ebe1", "activeForeground": "#1b2547", "inactiveBackground": "#f6f2ea", "inactiveForeground": "#555b6e"},
+    "complementary": {"bg": ("#131210", "#1c1a17"), "fg": "#f2eee8", "inactive": "#a39c91", "link": "#9fb4c2"},
+    "selection": {"bg": ("#3e5869", "#4a6577"), "fg": "#fffaf5", "inactive": "#e2e8ec"},
+    "wm": {"activeBackground": "#f4f1ec", "activeForeground": "#1d1b18", "inactiveBackground": "#f4f1ec", "inactiveForeground": "#6a645b"},
 }
 NIGHT = {
     "name": "Stiloria Night",
     "file": "Stiloria",  # the name existing accounts already use
-    "comment": "Navy glass and marble text, for the night. Selections are navy with white text; focus is the helmet's gold.",
-    "fg": {"ForegroundNormal": "#eef2f8", "ForegroundInactive": "#9aa7bb", "ForegroundActive": "#d9a74a",
-           "ForegroundLink": "#e6bc73", "ForegroundVisited": "#b8a4d4", "ForegroundNegative": "#f47f66",
-           "ForegroundNeutral": "#f2994a", "ForegroundPositive": "#66c48f"},
-    "deco": {"DecorationFocus": "#d9a74a", "DecorationHover": "#e6bc73"},
+    "comment": "Porcelain at night: warm black, ivory text, one slate accent.",
+    "fg": {"ForegroundNormal": "#f2eee8", "ForegroundInactive": "#a39c91", "ForegroundActive": "#9fb4c2",
+           "ForegroundLink": "#9fb4c2", "ForegroundVisited": "#c6aed3", "ForegroundNegative": "#f08a75",
+           "ForegroundNeutral": "#e0b15e", "ForegroundPositive": "#7fc49b"},
+    "deco": {"DecorationFocus": "#f2eee8", "DecorationHover": "#8f877b"},
     "sets": {
-        "Window": ("#131d30", "#1b2840"),
-        "View": ("#0c1524", "#111b2c"),
-        "Button": ("#1b2840", "#22314d"),
-        "Header": ("#0e2048", "#131d30"),
-        "Header][Inactive": ("#131d30", "#1b2840"),
-        "Tooltip": ("#1b2840", "#131d30"),
+        "Window": ("#131210", "#0d0c0b"),
+        "View": ("#1c1a17", "#131210"),
+        "Button": ("#2a2724", "#322f2b"),
+        "Header": ("#131210", "#0d0c0b"),
+        "Header][Inactive": ("#131210", "#0d0c0b"),
+        "Tooltip": ("#1c1a17", "#131210"),
     },
-    "complementary": {"bg": ("#080f1d", "#0e2048"), "fg": "#eef2f8", "inactive": "#9aa7bb"},
-    "selection": {"bg": ("#2b3e7b", "#34498c"), "fg": "#ffffff", "inactive": "#c9cfe0"},
-    "wm": {"activeBackground": "#0e2048", "activeForeground": "#eef2f8", "inactiveBackground": "#131d30", "inactiveForeground": "#9aa7bb"},
+    "complementary": {"bg": ("#131210", "#1c1a17"), "fg": "#f2eee8", "inactive": "#a39c91", "link": "#9fb4c2"},
+    "selection": {"bg": ("#9fb4c2", "#b0c2ce"), "fg": "#1d1b18", "inactive": "#333d44"},
+    "wm": {"activeBackground": "#131210", "activeForeground": "#f2eee8", "inactiveBackground": "#131210", "inactiveForeground": "#a39c91"},
 }
 
 def rgb(h):
@@ -108,14 +109,15 @@ IntensityEffect=0"""]
                     problems.append(f"{m['name']} {name}: {key} {m['fg'][key]} on {b} is {contrast(m['fg'][key], b):.2f}:1")
     c = m["complementary"]
     parts.append(group("Complementary", c["bg"], {**m["fg"], "ForegroundNormal": c["fg"], "ForegroundInactive": c["inactive"],
-                                                    "ForegroundLink": "#e6bc73", "ForegroundActive": "#d9a74a"}, m["deco"]))
+                                                    "ForegroundLink": c["link"], "ForegroundActive": c["link"]}, m["deco"]))
     s = m["selection"]
     sel_fg = {k: s["fg"] for k in m["fg"]}
     sel_fg["ForegroundInactive"] = s["inactive"]
     parts.append(group("Selection", s["bg"], sel_fg, m["deco"]))
     for b in s["bg"]:
-        if contrast(s["fg"], b) < 4.5:
-            problems.append(f"{m['name']} selection text on {b} is {contrast(s['fg'], b):.2f}:1")
+        for key in ("fg", "inactive"):
+            if contrast(s[key], b) < 4.5:
+                problems.append(f"{m['name']} selection {key} {s[key]} on {b} is {contrast(s[key], b):.2f}:1")
     parts.append(f"[General]\nColorScheme={m['file']}\nName={m['name']}\nshadeSortColumn=true")
     parts.append("[KDE]\ncontrast=4")
     w = m["wm"]

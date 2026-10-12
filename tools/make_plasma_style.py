@@ -1,5 +1,6 @@
-"""Write the Stiloria Plasma style: glass panels and menus, navy pill selections
-with a gold edge, pill fields and buttons.
+"""Write the Stiloria Plasma style, in the Porcelain design: solid panels and
+menus, quiet sunk hovers, a slate-tinted selection, ink focus rings, pill
+fields and buttons.
 
 usage: python3 tools/make_plasma_style.py   (from the repo root)
 
@@ -20,16 +21,17 @@ K = 0.5523  # cubic Bézier control distance for a quarter circle
 E = 4  # length of the stretched edge slices and of the center
 
 STYLE = """<defs><style type="text/css" id="current-color-scheme">
-.ColorScheme-Background { color:#f4efe6; }
-.ColorScheme-Text { color:#1b2547; }
-.ColorScheme-Highlight { color:#23315f; }
-.ColorScheme-ViewBackground { color:#fbf8f2; }
-.ColorScheme-ViewText { color:#1b2547; }
-.ColorScheme-ViewFocus { color:#c99a45; }
-.ColorScheme-ViewHover { color:#d9a74a; }
-.ColorScheme-ButtonBackground { color:#eee7da; }
-.ColorScheme-ButtonFocus { color:#c99a45; }
-.ColorScheme-ButtonHover { color:#d9a74a; }
+.ColorScheme-Background { color:#f4f1ec; }
+.ColorScheme-Text { color:#1d1b18; }
+.ColorScheme-Highlight { color:#3e5869; }
+.ColorScheme-ViewBackground { color:#fbfaf7; }
+.ColorScheme-ViewText { color:#1d1b18; }
+.ColorScheme-ViewFocus { color:#1d1b18; }
+.ColorScheme-ViewHover { color:#857d71; }
+.ColorScheme-ButtonBackground { color:#fbfaf7; }
+.ColorScheme-ButtonFocus { color:#1d1b18; }
+.ColorScheme-ButtonHover { color:#857d71; }
+.ColorScheme-NeutralText { color:#8a5a10; }
 </style></defs>"""
 
 
@@ -46,8 +48,10 @@ class Svg:
     def shape(self, d, cls, opacity):
         return f'<path class="{cls}" style="fill:currentColor;fill-opacity:{fmt(opacity)}" d="{d}"/>'
 
-    def frame(self, prefix, S, R, layers, hints=None, spacer=True):
-        """layers: (cls, opacity, outer inset, inner inset or None for a fill)."""
+    def frame(self, prefix, S, R, layers, hints=None, spacer=True, bar=None):
+        """layers: (cls, opacity, outer inset, inner inset or None for a fill).
+        bar: (side, cls, opacity, thickness, gap), a short mark along one side
+        that stays between the corners however wide the frame is stretched."""
         ox, oy = 0, self.y
         name = (prefix + "-") if prefix else ""
         pos = {"topleft": (0, 0), "top": (S, 0), "topright": (S + E, 0), "left": (0, S), "center": (S, S),
@@ -63,6 +67,11 @@ class Svg:
                 d = self.slice_path(part, x0, y0, S, R, a, b)
                 if d:
                     items.append(self.shape(d, cls, opacity))
+            if bar and part == bar[0]:
+                side, cls, opacity, t, gap = bar
+                x, y, w, h = {"bottom": (0, S - gap - t, E, t), "top": (0, gap, E, t),
+                              "left": (gap, 0, t, E), "right": (S - gap - t, 0, t, E)}[side]
+                items.append(self.shape(f"M{fmt(x0 + x)},{fmt(y0 + y)} h{fmt(w)} v{fmt(h)} h{fmt(-w)} Z", cls, opacity))
             self.parts.append(f'<g id="{name}{part}">' + "".join(items) + "</g>")
         size = 2 * S + E
         if hints:
@@ -128,7 +137,7 @@ class Svg:
 
 
 def shadow(svg, S, R, strength):
-    """A soft shadow around a glass frame: radial at the corners, linear on the
+    """A soft shadow around a panel: radial at the corners, linear on the
     sides. KWin draws it outside the window, so the inside is left empty."""
     ox, oy = 0, svg.y
     defs = []
@@ -163,119 +172,120 @@ def shadow(svg, S, R, strength):
     svg.y += 2 * S + E + 8
 
 
-def glass(rel, R, margin, opacity, shadow_size, shadow_strength, extra=None):
-    """A glass surface: translucent fill, a faint outer edge, and a lighter inner
-    edge that reads as a highlight on light glass."""
+def surface(rel, R, margin, shadow_size, shadow_strength, extra=None):
+    """A Porcelain panel: a solid surface with a hairline edge and a soft shadow."""
     svg = Svg()
     S = R
-    layers = [("ColorScheme-Background", opacity, 1, None),
-              ("ColorScheme-Text", 0.10, 0, 1),
-              ("ColorScheme-ViewBackground", 0.55, 1, 2)]
+    layers = [("ColorScheme-ViewBackground", 1, 1, None), ("ColorScheme-Text", 0.10, 0, 1)]
     hints = {"top-margin": margin, "bottom-margin": margin, "left-margin": margin, "right-margin": margin,
              "top-inset": 4, "bottom-inset": 4, "left-inset": 4, "right-inset": 4}
     svg.frame("", S, R, layers, hints)
     svg.frame("mask", S, R, [("ColorScheme-Background", 1, 0, None)])
     if extra:
-        extra(svg, S, R, opacity)
+        extra(svg, S, R, layers)
     shadow(svg, shadow_size, R, shadow_strength)
     svg.element('<rect id="hint-tile-center" x="0" y="0" width="5" height="5" style="fill:#000;fill-opacity:0"/>')
     svg.write(rel)
 
 
-def thick(svg, S, R, opacity):
-    svg.frame("thick", S, R, [("ColorScheme-Background", opacity, 1, None), ("ColorScheme-Text", 0.10, 0, 1),
-                              ("ColorScheme-ViewBackground", 0.55, 1, 2)],
-              {"top-margin": 8, "bottom-margin": 8, "left-margin": 8, "right-margin": 8})
+def thick(svg, S, R, layers):
+    svg.frame("thick", S, R, layers, {"top-margin": 8, "bottom-margin": 8, "left-margin": 8, "right-margin": 8})
 
 
-# Glass surfaces: opaque files for desktops without blur, translucent ones for blur.
-for base, opacity in (("", 0.97), ("translucent/", 0.72)):
-    glass(f"{base}dialogs/background.svgz", R=26, margin=12, opacity=opacity, shadow_size=30, shadow_strength=0.30)
-    glass(f"{base}widgets/panel-background.svgz", R=22, margin=6, opacity=opacity, shadow_size=24, shadow_strength=0.26, extra=thick)
-    glass(f"{base}widgets/tooltip.svgz", R=14, margin=8, opacity=min(opacity + 0.12, 0.97), shadow_size=18, shadow_strength=0.24)
-    glass(f"{base}widgets/background.svgz", R=22, margin=12, opacity=opacity, shadow_size=24, shadow_strength=0.22)
+# Panels and menus are solid; Porcelain keeps frost for things you press.
+# Plasma looks for translucent/, solid/ and opaque/ versions of these first
+# (depending on blur, compositing and the panel's opacity setting) and takes
+# Breeze's when a theme has none, so every variant gets the same solid surface.
+for variant in ("", "translucent/", "solid/", "opaque/"):
+    surface(f"{variant}dialogs/background.svgz", R=24, margin=12, shadow_size=30, shadow_strength=0.20)
+    surface(f"{variant}widgets/panel-background.svgz", R=24, margin=6, shadow_size=24, shadow_strength=0.14, extra=thick)
+    surface(f"{variant}widgets/tooltip.svgz", R=14, margin=8, shadow_size=18, shadow_strength=0.18)
+    surface(f"{variant}widgets/background.svgz", R=24, margin=12, shadow_size=24, shadow_strength=0.14)
 
 # List items (start menu, system tray, notification history). Plasma marks the
 # current item with the "hover" frame and keeps the item's own text color, so
-# selections are a light navy pill (a tint, readable under dark or light text)
-# with a gold edge; pressed items take a deeper tint.
+# the current item is a sunk well, as in Porcelain, and a selected (pressed)
+# one takes the accent's soft tint.
 svg = Svg()
 R = 12  # at most half the shortest row (start menu rows are about 30px), or corners overlap
 svg.frame("normal", R, R, [])
-svg.frame("hover", R, R, [("ColorScheme-Highlight", 0.32, 0, None), ("ColorScheme-ViewFocus", 0.80, 0, 1.2)])
-svg.frame("selected", R, R, [("ColorScheme-Highlight", 0.40, 0, None), ("ColorScheme-ViewFocus", 0.90, 0, 1.3)])
-svg.frame("selected+hover", R, R, [("ColorScheme-Highlight", 0.46, 0, None), ("ColorScheme-ViewFocus", 1, 0, 1.4)])
+svg.frame("hover", R, R, [("ColorScheme-Text", 0.07, 0, None)])
+svg.frame("selected", R, R, [("ColorScheme-Highlight", 0.16, 0, None)])
+svg.frame("selected+hover", R, R, [("ColorScheme-Highlight", 0.22, 0, None)])
 svg.element('<rect id="hint-tile-center" x="0" y="0" width="5" height="5" style="fill:#000;fill-opacity:0"/>')
 svg.write("widgets/viewitem.svgz")
 
-# Text fields: pills, with a gold edge on focus.
+# Text fields: a sunk pill with no border; a faint ring on hover, and the 2px
+# ink ring on focus. Fields are about 30px tall; corners taller than half that
+# overlap, and the overlap shows as a darker line through the fill.
 svg = Svg()
-R = 16
+R = 14
 pad = {"left-margin": 14, "right-margin": 14, "top-margin": 6, "bottom-margin": 6}
-svg.frame("base", R, R, [("ColorScheme-ViewBackground", 0.70, 1, None), ("ColorScheme-Text", 0.12, 0, 1)], pad)
-svg.frame("hover", R, R, [("ColorScheme-ViewHover", 0.85, 0, 1.2)], pad)
-svg.frame("focus", R, R, [("ColorScheme-ViewFocus", 1, 0, 1.6)], pad)
-svg.frame("focusframe", R, R, [("ColorScheme-ViewFocus", 0.35, 0, 3)], pad)
+svg.frame("base", R, R, [("ColorScheme-Text", 0.07, 0, None)], pad)
+svg.frame("hover", R, R, [("ColorScheme-Text", 0.28, 0, 1)], pad)
+svg.frame("focus", R, R, [("ColorScheme-ViewFocus", 1, 0, 2)], pad)
+svg.frame("focusframe", R, R, [("ColorScheme-ViewFocus", 1, 0, 2)], pad)
 svg.element('<rect id="hint-focus-over-base" x="0" y="0" width="2" height="2" style="fill:#000;fill-opacity:0"/>')
 svg.element('<rect id="hint-tile-center" x="0" y="0" width="5" height="5" style="fill:#000;fill-opacity:0"/>')
 svg.write("widgets/lineedit.svgz")
 
-# Buttons: quiet pills; pressed takes the navy selection; focus is a gold edge.
+# Buttons: frost pills (a faint fill and a fine rim) that thicken on hover and
+# when pressed or checked; focus is the 2px ink ring. Tool buttons are ghosts.
 svg = Svg()
-R = 15
+R = 14  # as for fields: no more than half a button's height
 pad = {"left-margin": 12, "right-margin": 12, "top-margin": 5, "bottom-margin": 5}
-svg.frame("normal", R, R, [("ColorScheme-Text", 0.07, 1, None), ("ColorScheme-Text", 0.10, 0, 1)], pad)
+svg.frame("normal", R, R, [("ColorScheme-Text", 0.05, 1, None), ("ColorScheme-Text", 0.14, 0, 1)], pad)
 svg.frame("mask-normal", R, R, [("ColorScheme-Background", 1, 0, None)])
-svg.frame("hover", R, R, [("ColorScheme-ButtonHover", 0.9, 0, 1.2)], pad)
-svg.frame("focus", R, R, [("ColorScheme-ButtonFocus", 1, 0, 1.6)], pad)
-svg.frame("pressed", R, R, [("ColorScheme-Highlight", 1, 0, None), ("ColorScheme-ButtonFocus", 0.85, 0, 1.2)], pad)
-svg.frame("toolbutton-hover", R, R, [("ColorScheme-Text", 0.08, 0, None)], pad)
-svg.frame("toolbutton-focus", R, R, [("ColorScheme-ButtonFocus", 0.9, 0, 1.4)], pad)
-svg.frame("toolbutton-pressed", R, R, [("ColorScheme-Highlight", 1, 0, None), ("ColorScheme-ButtonFocus", 0.85, 0, 1.2)], pad)
+svg.frame("hover", R, R, [("ColorScheme-Text", 0.05, 1, None), ("ColorScheme-Text", 0.24, 0, 1)], pad)
+svg.frame("focus", R, R, [("ColorScheme-ButtonFocus", 1, 0, 2)], pad)
+svg.frame("pressed", R, R, [("ColorScheme-Text", 0.14, 1, None), ("ColorScheme-Text", 0.20, 0, 1)], pad)
+svg.frame("toolbutton-hover", R, R, [("ColorScheme-Text", 0.07, 0, None)], pad)
+svg.frame("toolbutton-focus", R, R, [("ColorScheme-ButtonFocus", 1, 0, 2)], pad)
+svg.frame("toolbutton-pressed", R, R, [("ColorScheme-Text", 0.13, 0, None)], pad)
 svg.frame("shadow", R, R, [], {"top-margin": 1, "bottom-margin": 1, "left-margin": 1, "right-margin": 1})
 svg.element('<rect id="normal-hint-compose-over-border" x="0" y="0" width="2" height="2" style="fill:#000;fill-opacity:0"/>')
 svg.element('<rect id="pressed-hint-compose-over-border" x="0" y="0" width="2" height="2" style="fill:#000;fill-opacity:0"/>')
 svg.write("widgets/button.svgz")
 
-# Open apps in the panel: a faint tile on hover, and for the active one a tile
-# with a gold line along the panel edge.
+# Open apps in the panel: a sunk tile on hover, and for the active one a sunk
+# tile with a short slate mark along the panel's screen edge.
 svg = Svg()
 R = 14
-for edge in ("", "north-", "west-", "east-"):
+for edge, side in (("", "bottom"), ("north-", "top"), ("west-", "left"), ("east-", "right")):
     pad = {"left-margin": 6, "right-margin": 6, "top-margin": 6, "bottom-margin": 6}
     svg.frame(f"{edge}normal", R, R, [], pad)
-    svg.frame(f"{edge}hover", R, R, [("ColorScheme-Text", 0.08, 0, None)], pad)
-    svg.frame(f"{edge}attention", R, R, [("ColorScheme-NeutralText", 0.22, 0, None), ("ColorScheme-NeutralText", 0.9, 0, 1.4)], pad)
+    svg.frame(f"{edge}hover", R, R, [("ColorScheme-Text", 0.07, 0, None)], pad)
+    svg.frame(f"{edge}attention", R, R, [("ColorScheme-NeutralText", 0.18, 0, None)], pad,
+              bar=(side, "ColorScheme-NeutralText", 1, 3, 2))
     svg.frame(f"{edge}minimized", R, R, [("ColorScheme-Text", 0.03, 0, None)], pad)
-    svg.frame(f"{edge}progress", R, R, [("ColorScheme-ViewFocus", 0.30, 0, None)], pad)
-    svg.frame(f"{edge}focus", R, R, [("ColorScheme-Text", 0.10, 0, None), ("ColorScheme-ViewFocus", 1, 0, 1.6)], pad)
+    svg.frame(f"{edge}progress", R, R, [("ColorScheme-Highlight", 0.22, 0, None)], pad)
+    svg.frame(f"{edge}focus", R, R, [("ColorScheme-Text", 0.07, 0, None)], pad,
+              bar=(side, "ColorScheme-Highlight", 1, 3, 2))
 svg.write("widgets/tasks.svgz")
 
 meta = {
     "KPlugin": {
         "Authors": [{"Name": "Stiloria"}],
         "Category": "",
-        "Description": "Warm glass and navy pills with a gold edge, for Stiloria Day and Stiloria Night",
+        "Description": "Porcelain: solid ivory or warm-black panels, ink text and one slate accent, for Stiloria Day and Stiloria Night",
         "EnabledByDefault": True,
         "Id": "stiloria",
         "License": "LGPL-2.0-or-later",
         "Name": "Stiloria",
-        "Version": "1.0",
+        "Version": "2.0",
         "Website": "https://github.com/mslanden/stiloria",
     },
     "X-Plasma-API": "5.0",
 }
 (ROOT / "metadata.json").write_text(json.dumps(meta, indent=4) + "\n")
+# Solid panels: no translucent variants, and no blur or contrast behind them.
 (ROOT / "plasmarc").write_text("""[AdaptiveTransparency]
-enabled=true
+enabled=false
 
 [ContrastEffect]
-enabled=true
-contrast=0.85
-intensity=1.05
-saturation=1.3
+enabled=false
 
 [BlurBehindEffect]
-enabled=true
+enabled=false
 """)
 print("wrote", ROOT / "metadata.json", "and plasmarc")

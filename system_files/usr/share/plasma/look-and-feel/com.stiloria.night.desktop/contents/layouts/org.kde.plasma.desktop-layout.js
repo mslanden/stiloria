@@ -1,4 +1,4 @@
-// Stiloria's desktop: a floating glass panel along the bottom with the start
+// Stiloria's desktop: a floating panel along the bottom with the start
 // button, pinned apps, the tray and the clock; the Stiloria wallpaper, whose
 // night image Plasma shows with Stiloria Night; and the greeting.
 var panel = new Panel;
