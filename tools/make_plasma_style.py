@@ -136,40 +136,47 @@ class Svg:
         print("wrote", path)
 
 
-def shadow(svg, S, R, strength):
-    """A soft shadow around a panel: radial at the corners, linear on the
-    sides. KWin draws it outside the window, so the inside is left empty."""
+def shadow(svg, M, R, strength):
+    """A soft shadow M px wide around a frame with corners of radius R, shaped
+    like the frame: KWin lays its tiles around the window and lets each
+    reach inside by its size less the margin hint, under the window. Each
+    reaches in by R, so a corner tile ends at its arc's center and a radial
+    fade from there follows the curve. With shorter tiles, the gap between
+    the curve and the window's square corner gets no shadow and shows as a
+    light notch."""
+    T = M + R  # tile depth: M outside the window, R under it
     ox, oy = 0, svg.y
     defs = []
-    for part, (px, py, cx, cy) in {"topleft": (0, 0, S, S), "topright": (S + E, 0, S + E, S),
-                                    "bottomleft": (0, S + E, S, S + E), "bottomright": (S + E, S + E, S + E, S + E)}.items():
+
+    def stops(scale=1.0):
+        # Full strength under the frame (the first R px), then a fade.
+        return (f'<stop offset="0" stop-color="#000" stop-opacity="{strength}"/>'
+                f'<stop offset="{fmt(R / T)}" stop-color="#000" stop-opacity="{strength}"/>'
+                f'<stop offset="{fmt((R + 0.45 * M) / T)}" stop-color="#000" stop-opacity="{strength * 0.45:.3f}"/>'
+                f'<stop offset="1" stop-color="#000" stop-opacity="0"/>')
+    for part, (px, py, cx, cy) in {"topleft": (0, 0, T, T), "topright": (T + E, 0, T + E, T),
+                                    "bottomleft": (0, T + E, T, T + E), "bottomright": (T + E, T + E, T + E, T + E)}.items():
         gid = f"sh-{part}-{oy}"
-        defs.append(f'<radialGradient id="{gid}" gradientUnits="userSpaceOnUse" cx="{ox + cx}" cy="{oy + cy}" r="{S}">'
-                    f'<stop offset="0" stop-color="#000" stop-opacity="{strength}"/>'
-                    f'<stop offset="0.45" stop-color="#000" stop-opacity="{strength * 0.45:.3f}"/>'
-                    f'<stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>')
-        svg.element(f'<rect id="shadow-{part}" x="{ox + px}" y="{oy + py}" width="{S}" height="{S}" style="fill:url(#{gid})"/>')
+        defs.append(f'<radialGradient id="{gid}" gradientUnits="userSpaceOnUse" cx="{ox + cx}" cy="{oy + cy}" r="{T}">{stops()}</radialGradient>')
+        svg.element(f'<rect id="shadow-{part}" x="{ox + px}" y="{oy + py}" width="{T}" height="{T}" style="fill:url(#{gid})"/>')
     for part, (px, py, w, h, x1, y1, x2, y2) in {
-            "top": (S, 0, E, S, 0, S, 0, 0), "bottom": (S, S + E, E, S, 0, S + E, 0, 2 * S + E),
-            "left": (0, S, S, E, S, 0, 0, 0), "right": (S + E, S, S, E, S + E, 0, 2 * S + E, 0)}.items():
+            "top": (T, 0, E, T, 0, T, 0, 0), "bottom": (T, T + E, E, T, 0, T + E, 0, 2 * T + E),
+            "left": (0, T, T, E, T, 0, 0, 0), "right": (T + E, T, T, E, T + E, 0, 2 * T + E, 0)}.items():
         gid = f"sh-{part}-{oy}"
-        defs.append(f'<linearGradient id="{gid}" gradientUnits="userSpaceOnUse" x1="{ox + x1}" y1="{oy + y1}" x2="{ox + x2}" y2="{oy + y2}">'
-                    f'<stop offset="0" stop-color="#000" stop-opacity="{strength}"/>'
-                    f'<stop offset="0.45" stop-color="#000" stop-opacity="{strength * 0.45:.3f}"/>'
-                    f'<stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>')
+        defs.append(f'<linearGradient id="{gid}" gradientUnits="userSpaceOnUse" x1="{ox + x1}" y1="{oy + y1}" x2="{ox + x2}" y2="{oy + y2}">{stops()}</linearGradient>')
         svg.element(f'<rect id="shadow-{part}" x="{ox + px}" y="{oy + py}" width="{w}" height="{h}" style="fill:url(#{gid})"/>')
-    svg.element(f'<rect id="shadow-center" x="{ox + S}" y="{oy + S}" width="{E}" height="{E}" style="fill:#000;fill-opacity:0"/>')
+    svg.element(f'<rect id="shadow-center" x="{ox + T}" y="{oy + T}" width="{E}" height="{E}" style="fill:#000;fill-opacity:0"/>')
     svg.element("<defs>" + "".join(defs) + "</defs>")
-    hx = ox + 2 * S + E + 8
+    hx = ox + 2 * T + E + 8
     for i, side in enumerate(("top", "bottom", "left", "right")):
         for j, kind in enumerate(("margin", "inset")):
-            # How far the shadow reaches past the frame, and how far it starts inside it.
-            value = {"margin": S - 6, "inset": R}[kind]
+            # How far the shadow reaches past the frame, and how far under it.
+            value = {"margin": M, "inset": R}[kind]
             horizontal = side in ("left", "right")
             w, h = (value, 2) if horizontal else (2, value)
             svg.element(f'<rect id="shadow-hint-{side}-{kind}" x="{hx + (i * 2 + j) * 24}" y="{oy}" width="{w}" height="{h}" style="fill:#000;fill-opacity:0"/>')
-    svg.width = max(svg.width, 2 * S + E + 8 + 8 * 24 + 40)
-    svg.y += 2 * S + E + 8
+    svg.width = max(svg.width, 2 * T + E + 8 + 8 * 24 + 40)
+    svg.y += 2 * T + E + 8
 
 
 def surface(rel, R, margin, shadow_size, shadow_strength, extra=None):
@@ -180,7 +187,11 @@ def surface(rel, R, margin, shadow_size, shadow_strength, extra=None):
     hints = {"top-margin": margin, "bottom-margin": margin, "left-margin": margin, "right-margin": margin,
              "top-inset": 4, "bottom-inset": 4, "left-inset": 4, "right-inset": 4}
     svg.frame("", S, R, layers, hints)
-    svg.frame("mask", S, R, [("ColorScheme-Background", 1, 0, None)])
+    # The mask is the region KWin treats as the window's own for effects such
+    # as blur. A pixel only partly covered at the curve counts as fully
+    # inside, so at full size it reaches past the rounded edge and shows a
+    # corner notch; 2px inside, it stays under the opaque fill.
+    svg.frame("mask", S, R, [("ColorScheme-Background", 1, 2, None)])
     if extra:
         extra(svg, S, R, layers)
     shadow(svg, shadow_size, R, shadow_strength)
@@ -190,6 +201,7 @@ def surface(rel, R, margin, shadow_size, shadow_strength, extra=None):
 
 def thick(svg, S, R, layers):
     svg.frame("thick", S, R, layers, {"top-margin": 8, "bottom-margin": 8, "left-margin": 8, "right-margin": 8})
+    svg.frame("mask-thick", S, R, [("ColorScheme-Background", 1, 2, None)])
 
 
 # Panels and menus are solid; Porcelain keeps frost for things you press.
@@ -197,10 +209,10 @@ def thick(svg, S, R, layers):
 # (depending on blur, compositing and the panel's opacity setting) and takes
 # Breeze's when a theme has none, so every variant gets the same solid surface.
 for variant in ("", "translucent/", "solid/", "opaque/"):
-    surface(f"{variant}dialogs/background.svgz", R=24, margin=12, shadow_size=30, shadow_strength=0.20)
-    surface(f"{variant}widgets/panel-background.svgz", R=24, margin=6, shadow_size=24, shadow_strength=0.14, extra=thick)
-    surface(f"{variant}widgets/tooltip.svgz", R=14, margin=8, shadow_size=18, shadow_strength=0.18)
-    surface(f"{variant}widgets/background.svgz", R=24, margin=12, shadow_size=24, shadow_strength=0.14)
+    surface(f"{variant}dialogs/background.svgz", R=24, margin=12, shadow_size=24, shadow_strength=0.20)
+    surface(f"{variant}widgets/panel-background.svgz", R=24, margin=6, shadow_size=18, shadow_strength=0.14, extra=thick)
+    surface(f"{variant}widgets/tooltip.svgz", R=14, margin=8, shadow_size=12, shadow_strength=0.18)
+    surface(f"{variant}widgets/background.svgz", R=24, margin=12, shadow_size=18, shadow_strength=0.14)
 
 # List items (start menu, system tray, notification history). Plasma marks the
 # current item with the "hover" frame and keeps the item's own text color, so
