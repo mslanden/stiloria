@@ -72,3 +72,15 @@ if ((done_steps < 4)); then
         });' >/dev/null || exit 0
     done_with 4
 fi
+
+# 5: the greeting at the top left of the desktop (Stiloria Greeting). Until the
+# widget is installed this step waits, trying again at the next login.
+if ((done_steps < 5)); then
+    [[ -d /usr/share/plasma/plasmoids/com.stiloria.greeting ]] || exit 0
+    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+        var desktop = desktopForScreen(0);
+        if (desktop.widgets("com.stiloria.greeting").length === 0) {
+            desktop.addWidget("com.stiloria.greeting", 96, 64, 640, 304);
+        }' >/dev/null || exit 0
+    done_with 5
+fi

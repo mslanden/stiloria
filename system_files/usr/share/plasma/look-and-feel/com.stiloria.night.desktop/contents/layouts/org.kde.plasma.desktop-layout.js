@@ -33,6 +33,6 @@ for (var i = 0; i < desktopsArray.length; i++) {
     desktop.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
     desktop.writeConfig("Image", "/usr/share/wallpapers/Stiloria/");
     if (knownWidgetTypes.indexOf("com.stiloria.greeting") >= 0) {
-        desktop.addWidget("com.stiloria.greeting", 72, 56, 680, 400);
+        desktop.addWidget("com.stiloria.greeting", 96, 64, 640, 304);
     }
 }
