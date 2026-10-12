@@ -58,8 +58,8 @@ depmod "$kernel"
 dnf -y install nvidia-gpu-firmware
 
 ### Booting from the stick: an initramfs that finds the ISO's squashfs, and
-# livesys, which logs into Plasma as "liveuser" with the installer on the
-# desktop and in Plasma Welcome.
+# livesys, which logs into Plasma as "liveuser" with "Install to Hard Drive"
+# on the desktop.
 dnf -y install dracut-live livesys-scripts
 DRACUT_NO_XATTR=1 dracut --force --zstd --reproducible --no-hostonly \
     --add "dmsquash-live dmsquash-live-autooverlay" \
@@ -79,8 +79,8 @@ cp -rv /src/system_files/. /
 sed "s|@INSTALL_IMAGE@|$INSTALL_IMAGE|g" /src/stiloria.ks >> /usr/share/anaconda/interactive-defaults.ks
 grep -q "^ostreecontainer --url=$INSTALL_IMAGE " /usr/share/anaconda/interactive-defaults.ks
 # The installer takes its title from here ("Stiloria installation") and its
-# welcome from os-release's NAME ("Let's install Stiloria now"), which the
-# installed system keeps as Bazzite's.
+# welcome from os-release's NAME ("Let's install Stiloria now"). Only the live
+# system changes: the installed one keeps Bazzite's NAME, as build_files does.
 echo "Stiloria release $(rpm -E %fedora)" > /etc/system-release
 sed -i 's/^NAME=.*/NAME="Stiloria"/' /usr/lib/os-release
 grep -qx 'NAME="Stiloria"' /usr/lib/os-release
