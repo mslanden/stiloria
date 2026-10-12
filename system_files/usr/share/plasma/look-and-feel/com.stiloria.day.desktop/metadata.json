@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "X-Plasma-APIVersion": "2",
+    "KPlugin": {
+        "Id": "com.stiloria.day.desktop",
+        "Name": "Stiloria Day",
+        "Description": "Porcelain by day: ivory and stone, ink text, one slate accent",
+        "Category": "",
+        "License": "GPL-2.0-or-later",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ],
+        "Website": "https://github.com/mslanden/stiloria"
+    }
+}

@@ -48,3 +48,39 @@ if ((done_steps < 3)); then
     plasma-apply-desktoptheme default >/dev/null 2>&1 || exit 0
     done_with 3
 fi
+
+# 4: Stiloria Day and Night. The look follows the time of day with Plasma's
+# automatic theme switching, starting with whichever fits now; the wallpaper and
+# lock screen name the Stiloria package, whose night image Plasma shows with the
+# night colors; and the bottom panel floats. The panel's layout and apps are
+# left as they are.
+if ((done_steps < 4)); then
+    kwriteconfig6 --file kdeglobals --group KDE --key DefaultLightLookAndFeel com.stiloria.day.desktop
+    kwriteconfig6 --file kdeglobals --group KDE --key DefaultDarkLookAndFeel com.stiloria.night.desktop
+    kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel true
+    hour=$(date +%-H)
+    look=com.stiloria.night.desktop
+    ((hour >= 7 && hour < 19)) && look=com.stiloria.day.desktop
+    plasma-apply-lookandfeel -a "$look" >/dev/null 2>&1 || exit 0
+    plasma-apply-wallpaperimage /usr/share/wallpapers/Stiloria >/dev/null 2>&1 || exit 0
+    for key in Image PreviewImage; do
+        kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key "$key" /usr/share/wallpapers/Stiloria/
+    done
+    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+        panels().forEach(function (panel) {
+            if (panel.location == "bottom") panel.floating = true;
+        });' >/dev/null || exit 0
+    done_with 4
+fi
+
+# 5: the greeting at the top left of the desktop (Stiloria Greeting). Until the
+# widget is installed this step waits, trying again at the next login.
+if ((done_steps < 5)); then
+    [[ -d /usr/share/plasma/plasmoids/com.stiloria.greeting ]] || exit 0
+    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+        var desktop = desktopForScreen(0);
+        if (desktop.widgets("com.stiloria.greeting").length === 0) {
+            desktop.addWidget("com.stiloria.greeting", 96, 64, 640, 304);
+        }' >/dev/null || exit 0
+    done_with 5
+fi

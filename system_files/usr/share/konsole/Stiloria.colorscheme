@@ -1,95 +1,95 @@
 [Background]
-Color=12,21,36
+Color=19,18,16
 
 [BackgroundFaint]
-Color=17,27,44
+Color=19,18,16
 
 [BackgroundIntense]
-Color=14,32,72
+Color=28,26,23
 
 [Color0]
-Color=27,40,64
+Color=43,40,36
 
 [Color0Faint]
-Color=17,27,44
+Color=28,26,23
 
 [Color0Intense]
-Color=115,130,156
+Color=113,106,95
 
 [Color1]
-Color=239,111,85
+Color=224,128,107
 
 [Color1Faint]
-Color=138,59,44
+Color=122,67,55
 
 [Color1Intense]
-Color=255,149,128
+Color=240,160,142
 
 [Color2]
-Color=102,196,143
+Color=127,196,155
 
 [Color2Faint]
-Color=58,115,85
+Color=63,106,82
 
 [Color2Intense]
-Color=148,224,180
+Color=165,220,185
 
 [Color3]
-Color=217,167,74
+Color=224,177,94
 
 [Color3Faint]
-Color=125,98,48
+Color=122,98,52
 
 [Color3Intense]
-Color=240,205,133
+Color=240,203,136
 
 [Color4]
-Color=95,157,224
+Color=159,180,194
 
 [Color4Faint]
-Color=52,86,126
+Color=86,99,107
 
 [Color4Intense]
-Color=143,189,240
+Color=195,211,221
 
 [Color5]
-Color=196,149,216
+Color=198,174,211
 
 [Color5Faint]
-Color=107,83,120
+Color=107,94,114
 
 [Color5Intense]
-Color=220,185,236
+Color=220,201,230
 
 [Color6]
-Color=92,196,196
+Color=143,196,192
 
 [Color6Faint]
-Color=51,110,112
+Color=77,107,105
 
 [Color6Intense]
-Color=143,224,223
+Color=180,220,216
 
 [Color7]
-Color=197,205,217
+Color=216,209,197
 
 [Color7Faint]
-Color=107,118,137
+Color=113,106,95
 
 [Color7Intense]
-Color=238,242,248
+Color=242,238,232
 
 [Foreground]
-Color=238,242,248
+Color=242,238,232
 
 [ForegroundFaint]
-Color=154,167,187
+Color=163,156,145
 
 [ForegroundIntense]
-Color=230,188,115
+Color=251,250,247
 
 [General]
-Blur=true
+Blur=false
 Description=Stiloria
-Opacity=0.9
+Opacity=1
 Wallpaper=

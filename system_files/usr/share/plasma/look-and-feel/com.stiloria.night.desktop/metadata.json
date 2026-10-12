@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "X-Plasma-APIVersion": "2",
+    "KPlugin": {
+        "Id": "com.stiloria.night.desktop",
+        "Name": "Stiloria Night",
+        "Description": "Porcelain at night: warm black, ivory text, one slate accent",
+        "Category": "",
+        "License": "GPL-2.0-or-later",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ],
+        "Website": "https://github.com/mslanden/stiloria"
+    }
+}

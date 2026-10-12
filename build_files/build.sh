@@ -75,7 +75,7 @@ done
 sed -i "s|file:///usr/share/backgrounds/default.jxl|file://$wallpaper|g" /usr/lib/plasmalogin/defaults.conf
 grep -q "$wallpaper" /usr/lib/plasmalogin/defaults.conf
 
-### Colors: navy and gold from the logo and wallpapers (Stiloria.colors)
+### Colors: Stiloria's scheme for Bazzite's own global themes (Stiloria.colors)
 # A new account gets the colors its global theme, Bazzite's Vapor, names: at
 # the first login startplasma copies the theme's defaults into
 # ~/.config/kdedefaults, which overrides /etc/xdg/kdeglobals, and applies that
@@ -98,6 +98,61 @@ test -f /usr/share/konsole/Stiloria.profile
 sed -i 's/^DefaultProfile=Vapor.profile$/DefaultProfile=Stiloria.profile/' /etc/xdg/kdeglobals
 grep -qx DefaultProfile=Stiloria.profile /etc/xdg/kdeglobals
 test -z "$(grep -s '^DefaultProfile=' /etc/xdg/konsolerc)"
+
+### Stiloria Day and Night: the Porcelain look, following the time of day
+# Two global themes (look-and-feel/com.stiloria.{day,night}.desktop) in the
+# Porcelain design: ivory and stone with ink text by day, warm black with ivory
+# text at night, one slate accent. Both use the Stiloria Plasma style (solid
+# panel and menus, sunk hovers, ink focus rings) with the color schemes
+# StiloriaDay and Stiloria; tools/make_plasma_style.py and tools/make_colors.py
+# generate them. Plasma's own switcher (the
+# lookandfeelautoswitcher kded module) changes between them at sunrise and
+# sunset, and the Stiloria wallpaper package has a night image
+# (contents/images_dark) that Plasma shows with the night colors. New accounts
+# start in Stiloria Day with a floating panel and the switcher on; existing
+# accounts move over once in stiloria-user-setup.
+for file in /usr/share/color-schemes/StiloriaDay.colors /usr/share/color-schemes/Stiloria.colors \
+    /usr/share/plasma/desktoptheme/stiloria/metadata.json \
+    /usr/share/plasma/look-and-feel/com.stiloria.{day,night}.desktop/metadata.json \
+    /usr/share/plasma/look-and-feel/com.stiloria.{day,night}.desktop/contents/layouts/org.kde.plasma.desktop-layout.js \
+    /usr/share/wallpapers/Stiloria/contents/images{,_dark}/3840x2160.jpg; do
+    test -f "$file"
+done
+sed -i 's/^LookAndFeelPackage=com.valve.vapor.desktop$/LookAndFeelPackage=com.stiloria.day.desktop/' /etc/xdg/kdeglobals
+sed -i '/^LookAndFeelPackage=com.stiloria.day.desktop$/a AutomaticLookAndFeel=true\nDefaultLightLookAndFeel=com.stiloria.day.desktop\nDefaultDarkLookAndFeel=com.stiloria.night.desktop' /etc/xdg/kdeglobals
+for line in LookAndFeelPackage=com.stiloria.day.desktop AutomaticLookAndFeel=true \
+    DefaultLightLookAndFeel=com.stiloria.day.desktop DefaultDarkLookAndFeel=com.stiloria.night.desktop; do
+    test "$(grep -cx "$line" /etc/xdg/kdeglobals)" = 1
+done
+# The lock screen names the wallpaper package rather than its day image, so it
+# turns to night with the desktop.
+sed -i "s|=$wallpaper\$|=/usr/share/wallpapers/Stiloria/|" /etc/xdg/kscreenlockerrc
+test "$(grep -c '=/usr/share/wallpapers/Stiloria/$' /etc/xdg/kscreenlockerrc)" = 2
+# Folders in Porcelain's stone instead of the slate accent: two icon themes,
+# Stiloria and Stiloria-Dark, that inherit Breeze and Breeze Dark and replace
+# only the accent-filled folder icons, made here from the image's own Breeze
+# (make_folder_icons.py). Stiloria Day and Night name them.
+python3 /ctx/make_folder_icons.py
+for theme in Stiloria Stiloria-Dark; do
+    for size in 32 48 64 96; do
+        grep -q 'style="fill:#' "/usr/share/icons/$theme/places/$size/folder.svg"
+        test -z "$(grep -l 'class="ColorScheme-Accent"' "/usr/share/icons/$theme/places/$size/folder.svg")"
+    done
+    test -L "/usr/share/icons/$theme/mimetypes/64/inode-directory.svg"
+    test -f "/usr/share/icons/$theme/icon-theme.cache"
+done
+grep -qx Theme=Stiloria /usr/share/plasma/look-and-feel/com.stiloria.day.desktop/contents/defaults
+grep -qx Theme=Stiloria-Dark /usr/share/plasma/look-and-feel/com.stiloria.night.desktop/contents/defaults
+# Porcelain's typefaces, Instrument Sans for the interface and Instrument Serif
+# for display text (the greeting, the boot wordmark). Fedora doesn't package
+# them, so they ship in system_files/usr/share/fonts (from github.com/google/fonts,
+# SIL Open Font License, OFL.txt beside each). Instrument Sans replaces Noto Sans
+# in Bazzite's default fonts; Fira Code stays the fixed-width font.
+fc-cache -f /usr/share/fonts/instrument-sans /usr/share/fonts/instrument-serif
+test "$(fc-match -f '%{family}' 'Instrument Sans')" = "Instrument Sans"
+test "$(fc-match -f '%{family}' 'Instrument Serif')" = "Instrument Serif"
+sed -i 's/^\(font\|menuFont\|smallestReadableFont\|toolBarFont\)=Noto Sans,/\1=Instrument Sans,/' /etc/xdg/kdeglobals
+test "$(grep -c '^\(font\|menuFont\|smallestReadableFont\|toolBarFont\)=Instrument Sans,' /etc/xdg/kdeglobals)" = 4
 
 ### Boot screen: Stiloria's watermark under the firmware logo (Plymouth's bgrt
 # theme draws spinner/watermark.png). Plymouth runs from the initramfs, so

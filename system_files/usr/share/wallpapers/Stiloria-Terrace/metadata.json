@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Id": "Stiloria-Terrace",
+        "Name": "Marble Terrace",
+        "License": "CC-BY-SA-4.0",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ]
+    }
+}
