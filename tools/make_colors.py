@@ -46,7 +46,7 @@ DAY = {
         "Tooltip": ("#fbf8f2", "#f4efe5"),
     },
     "complementary": {"bg": ("#1b2547", "#23315f"), "fg": "#eef2f8", "inactive": "#a9b3c7"},
-    "selection": {"bg": ("#23315f", "#2e3d73"), "fg": "#ffffff", "inactive": "#c9cfe0"},
+    "selection": {"bg": ("#263f80", "#2f4b91"), "fg": "#ffffff", "inactive": "#c9cfe0"},
     "wm": {"activeBackground": "#f1ebe1", "activeForeground": "#1b2547", "inactiveBackground": "#f6f2ea", "inactiveForeground": "#555b6e"},
 }
 NIGHT = {
