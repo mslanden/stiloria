@@ -99,6 +99,35 @@ sed -i 's/^DefaultProfile=Vapor.profile$/DefaultProfile=Stiloria.profile/' /etc/
 grep -qx DefaultProfile=Stiloria.profile /etc/xdg/kdeglobals
 test -z "$(grep -s '^DefaultProfile=' /etc/xdg/konsolerc)"
 
+### Stiloria Day and Night: the look follows the time of day
+# Two global themes (look-and-feel/com.stiloria.{day,night}.desktop): warm
+# marble glass by day, navy glass at night. Both use the Stiloria Plasma style
+# (glass panel and menus, light navy pills with a gold edge) with the color
+# schemes StiloriaDay and Stiloria; tools/make_plasma_style.py and
+# tools/make_colors.py generate them. Plasma's own switcher (the
+# lookandfeelautoswitcher kded module) changes between them at sunrise and
+# sunset, and the Stiloria wallpaper package has a night image
+# (contents/images_dark) that Plasma shows with the night colors. New accounts
+# start in Stiloria Day with a floating panel and the switcher on; existing
+# accounts move over once in stiloria-user-setup.
+for file in /usr/share/color-schemes/StiloriaDay.colors /usr/share/color-schemes/Stiloria.colors \
+    /usr/share/plasma/desktoptheme/stiloria/metadata.json \
+    /usr/share/plasma/look-and-feel/com.stiloria.{day,night}.desktop/metadata.json \
+    /usr/share/plasma/look-and-feel/com.stiloria.{day,night}.desktop/contents/layouts/org.kde.plasma.desktop-layout.js \
+    /usr/share/wallpapers/Stiloria/contents/images{,_dark}/3840x2160.jpg; do
+    test -f "$file"
+done
+sed -i 's/^LookAndFeelPackage=com.valve.vapor.desktop$/LookAndFeelPackage=com.stiloria.day.desktop/' /etc/xdg/kdeglobals
+sed -i '/^LookAndFeelPackage=com.stiloria.day.desktop$/a AutomaticLookAndFeel=true\nDefaultLightLookAndFeel=com.stiloria.day.desktop\nDefaultDarkLookAndFeel=com.stiloria.night.desktop' /etc/xdg/kdeglobals
+for line in LookAndFeelPackage=com.stiloria.day.desktop AutomaticLookAndFeel=true \
+    DefaultLightLookAndFeel=com.stiloria.day.desktop DefaultDarkLookAndFeel=com.stiloria.night.desktop; do
+    test "$(grep -cx "$line" /etc/xdg/kdeglobals)" = 1
+done
+# The lock screen names the wallpaper package rather than its day image, so it
+# turns to night with the desktop.
+sed -i "s|=$wallpaper\$|=/usr/share/wallpapers/Stiloria/|" /etc/xdg/kscreenlockerrc
+test "$(grep -c '=/usr/share/wallpapers/Stiloria/$' /etc/xdg/kscreenlockerrc)" = 2
+
 ### Boot screen: Stiloria's watermark under the firmware logo (Plymouth's bgrt
 # theme draws spinner/watermark.png). Plymouth runs from the initramfs, so
 # rebuild it with Bazzite's own dracut settings (/usr/lib/dracut/dracut.conf.d:

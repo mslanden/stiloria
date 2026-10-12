@@ -1,0 +1,12 @@
+{
+    "KPlugin": {
+        "Id": "Stiloria-Helmet",
+        "Name": "Stiloria Helmet",
+        "License": "CC-BY-SA-4.0",
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ]
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Stiloria"
+            }
+        ],
+        "Category": "",
+        "Description": "Warm glass and navy pills with a gold edge, for Stiloria Day and Stiloria Night",
+        "EnabledByDefault": true,
+        "Id": "stiloria",
+        "License": "LGPL-2.0-or-later",
+        "Name": "Stiloria",
+        "Version": "1.0",
+        "Website": "https://github.com/mslanden/stiloria"
+    },
+    "X-Plasma-API": "5.0"
+}
