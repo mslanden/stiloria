@@ -230,13 +230,21 @@ svg.write("widgets/viewitem.svgz")
 # Text fields: a sunk pill with no border; a faint ring on hover, and the 2px
 # ink ring on focus. Fields are about 30px tall; corners taller than half that
 # overlap, and the overlap shows as a darker line through the fill.
+#
+# Plasma draws the hover and focus frames around a field and a button, pushed
+# out by each frame's own margins (TextFieldFocus.qml, ButtonFocus.qml and
+# ButtonHover.qml anchor them at -margins). So those frames' margins are the
+# ring's offset, not padding: the hover ring hugs the edge (1px out) and the
+# focus ring is Porcelain's 2px ink halo 3px off the edge (5px out).
+HUG = {"left-margin": 1, "right-margin": 1, "top-margin": 1, "bottom-margin": 1}
+HALO = {"left-margin": 5, "right-margin": 5, "top-margin": 5, "bottom-margin": 5}
 svg = Svg()
 R = 14
 pad = {"left-margin": 14, "right-margin": 14, "top-margin": 6, "bottom-margin": 6}
 svg.frame("base", R, R, [("ColorScheme-Text", 0.07, 0, None)], pad)
-svg.frame("hover", R, R, [("ColorScheme-Text", 0.28, 0, 1)], pad)
-svg.frame("focus", R, R, [("ColorScheme-ViewFocus", 1, 0, 2)], pad)
-svg.frame("focusframe", R, R, [("ColorScheme-ViewFocus", 1, 0, 2)], pad)
+svg.frame("hover", R + 1, R + 1, [("ColorScheme-Text", 0.28, 0, 1)], HUG)
+svg.frame("focus", R + 5, R + 5, [("ColorScheme-ViewFocus", 1, 0, 2)], HALO)
+svg.frame("focusframe", R + 5, R + 5, [("ColorScheme-ViewFocus", 1, 0, 2)], HALO)
 svg.element('<rect id="hint-focus-over-base" x="0" y="0" width="2" height="2" style="fill:#000;fill-opacity:0"/>')
 svg.element('<rect id="hint-tile-center" x="0" y="0" width="5" height="5" style="fill:#000;fill-opacity:0"/>')
 svg.write("widgets/lineedit.svgz")
@@ -248,11 +256,11 @@ R = 14  # as for fields: no more than half a button's height
 pad = {"left-margin": 12, "right-margin": 12, "top-margin": 5, "bottom-margin": 5}
 svg.frame("normal", R, R, [("ColorScheme-Text", 0.05, 1, None), ("ColorScheme-Text", 0.14, 0, 1)], pad)
 svg.frame("mask-normal", R, R, [("ColorScheme-Background", 1, 0, None)])
-svg.frame("hover", R, R, [("ColorScheme-Text", 0.05, 1, None), ("ColorScheme-Text", 0.24, 0, 1)], pad)
-svg.frame("focus", R, R, [("ColorScheme-ButtonFocus", 1, 0, 2)], pad)
+svg.frame("hover", R + 1, R + 1, [("ColorScheme-Text", 0.05, 1, None), ("ColorScheme-Text", 0.24, 0, 1)], HUG)
+svg.frame("focus", R + 5, R + 5, [("ColorScheme-ButtonFocus", 1, 0, 2)], HALO)
 svg.frame("pressed", R, R, [("ColorScheme-Text", 0.14, 1, None), ("ColorScheme-Text", 0.20, 0, 1)], pad)
 svg.frame("toolbutton-hover", R, R, [("ColorScheme-Text", 0.07, 0, None)], pad)
-svg.frame("toolbutton-focus", R, R, [("ColorScheme-ButtonFocus", 1, 0, 2)], pad)
+svg.frame("toolbutton-focus", R + 5, R + 5, [("ColorScheme-ButtonFocus", 1, 0, 2)], HALO)
 svg.frame("toolbutton-pressed", R, R, [("ColorScheme-Text", 0.13, 0, None)], pad)
 svg.frame("shadow", R, R, [], {"top-margin": 1, "bottom-margin": 1, "left-margin": 1, "right-margin": 1})
 svg.element('<rect id="normal-hint-compose-over-border" x="0" y="0" width="2" height="2" style="fill:#000;fill-opacity:0"/>')
