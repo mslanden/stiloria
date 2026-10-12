@@ -294,7 +294,13 @@ elif [[ ! -f /ctx/achilles/achilles ]]; then
 else
     install -Dm755 /ctx/achilles/achilles /usr/bin/achilles
     ln -s achilles /usr/bin/stiloria
+    # Its icon, the Shield of Achilles: in full from 48px up, and simpler at
+    # 16-32px, where the full shield's waves blur.
     install -Dm644 /ctx/achilles/com.stiloria.desktop.png /usr/share/icons/hicolor/256x256/apps/com.stiloria.desktop.png
+    install -Dm644 /ctx/achilles/com.stiloria.desktop.svg /usr/share/icons/hicolor/scalable/apps/com.stiloria.desktop.svg
+    for size in 16 22 24 32; do
+        install -Dm644 "/ctx/achilles/com.stiloria.desktop-$size.png" "/usr/share/icons/hicolor/${size}x${size}/apps/com.stiloria.desktop.png"
+    done
     # GTK trusts hicolor's icon cache unless it is older than the theme folder,
     # and on an installed system every file has the same timestamp, so the
     # cache must list the icon. RPM triggers refresh it; nothing does here.

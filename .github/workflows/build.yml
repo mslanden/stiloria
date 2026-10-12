@@ -179,9 +179,17 @@ jobs:
           out="${GITHUB_WORKSPACE}/achilles-out"
           install -Dm755 src-tauri/target/release/achilles "${out}/achilles"
           install -Dm644 src-tauri/icons/128x128@2x.png "${out}/com.stiloria.desktop.png"
+          # The icon is the Shield of Achilles: in full as a scalable icon and at
+          # 256px, and simpler at 16-32px, where the full one's waves blur.
+          install -Dm644 src-tauri/icons/icon.svg "${out}/com.stiloria.desktop.svg"
+          for size in 16 22 24 32; do
+            install -Dm644 "src-tauri/icons/hicolor/${size}.png" "${out}/com.stiloria.desktop-${size}.png"
+            file -b "${out}/com.stiloria.desktop-${size}.png" | grep -q "^PNG image data, ${size} x ${size},"
+          done
           file -b "${out}/achilles" | grep -q '^ELF 64-bit LSB pie executable, x86-64'
           # The image installs it as hicolor's 256x256 icon.
           file -b "${out}/com.stiloria.desktop.png" | grep -q '^PNG image data, 256 x 256,'
+          grep -q '<svg' "${out}/com.stiloria.desktop.svg"
           du -h "${out}/achilles"
           sha256sum "${out}"/*
 
