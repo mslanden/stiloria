@@ -21,7 +21,7 @@ done
 
 # 1: wallpaper and lock screen
 if ((done_steps < 1)); then
-    wallpaper=/usr/share/wallpapers/Stiloria/contents/images/3840x2160.jpg
+    wallpaper=/usr/share/wallpapers/Stiloria-Helmet/contents/images/3840x2160.jpg
     plasma-apply-wallpaperimage "$wallpaper" >/dev/null 2>&1 || exit 0
     kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "file://$wallpaper"
     kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key PreviewImage "file://$wallpaper"
@@ -51,9 +51,8 @@ fi
 
 # 4: Stiloria Day and Night. The look follows the time of day with Plasma's
 # automatic theme switching, starting with whichever fits now; the wallpaper and
-# lock screen name the Stiloria package, whose night image Plasma shows with the
-# night colors; and the bottom panel floats. The panel's layout and apps are
-# left as they are.
+# lock screen name the Stiloria Helmet package; and the bottom panel floats. The
+# panel's layout and apps are left as they are.
 if ((done_steps < 4)); then
     kwriteconfig6 --file kdeglobals --group KDE --key DefaultLightLookAndFeel com.stiloria.day.desktop
     kwriteconfig6 --file kdeglobals --group KDE --key DefaultDarkLookAndFeel com.stiloria.night.desktop
@@ -62,9 +61,9 @@ if ((done_steps < 4)); then
     look=com.stiloria.night.desktop
     ((hour >= 7 && hour < 19)) && look=com.stiloria.day.desktop
     plasma-apply-lookandfeel -a "$look" >/dev/null 2>&1 || exit 0
-    plasma-apply-wallpaperimage /usr/share/wallpapers/Stiloria >/dev/null 2>&1 || exit 0
+    plasma-apply-wallpaperimage /usr/share/wallpapers/Stiloria-Helmet >/dev/null 2>&1 || exit 0
     for key in Image PreviewImage; do
-        kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key "$key" /usr/share/wallpapers/Stiloria/
+        kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key "$key" /usr/share/wallpapers/Stiloria-Helmet/
     done
     qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
         panels().forEach(function (panel) {
@@ -83,4 +82,39 @@ if ((done_steps < 5)); then
             desktop.addWidget("com.stiloria.greeting", 96, 64, 640, 304);
         }' >/dev/null || exit 0
     done_with 5
+fi
+
+# 6: the Stiloria Helmet is the default wallpaper again, in place of the sky
+# city that step 4 gave everyone. Desktops and the lock screen still showing
+# the sky city move to the helmet; a wallpaper picked since stays. A greeting
+# on a desktop that shows the helmet is set to ivory text, since the helmet's
+# wall stays dark while the day colors are on.
+if ((done_steps < 6)); then
+    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+        var skyCity = /^(file:\/\/)?\/usr\/share\/wallpapers\/Stiloria(\/|\/contents\/images\/3840x2160\.jpg)?$/;
+        var helmet = /^(file:\/\/)?\/usr\/share\/wallpapers\/Stiloria-Helmet(\/|\/contents\/images\/3840x2160\.jpg)?$/;
+        desktops().forEach(function (desktop) {
+            if (desktop.wallpaperPlugin != "org.kde.image") return;
+            desktop.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];
+            var image = String(desktop.readConfig("Image", ""));
+            if (skyCity.test(image)) {
+                image = "/usr/share/wallpapers/Stiloria-Helmet/";
+                desktop.writeConfig("Image", image);
+                desktop.reloadConfig();
+            }
+            if (!helmet.test(image)) return;
+            desktop.widgets("com.stiloria.greeting").forEach(function (greeting) {
+                greeting.currentConfigGroup = ["General"];
+                greeting.writeConfig("textColor", "light");
+                greeting.reloadConfig();
+            });
+        });' >/dev/null || exit 0
+    sky_city='^(file://)?/usr/share/wallpapers/Stiloria(/|/contents/images/3840x2160\.jpg)?$'
+    lock_image=$(kreadconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image)
+    if [[ $lock_image =~ $sky_city ]]; then
+        for key in Image PreviewImage; do
+            kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key "$key" /usr/share/wallpapers/Stiloria-Helmet/
+        done
+    fi
+    done_with 6
 fi

@@ -12,5 +12,9 @@
       <label>Show how to talk to Achilles</label>
       <default>true</default>
     </entry>
+    <entry name="textColor" type="String">
+      <label>The text's color: "auto" follows the day and night colors, "light" is always ivory (for a dark wallpaper), "dark" always ink</label>
+      <default>auto</default>
+    </entry>
   </group>
 </kcfg>
