@@ -25,15 +25,45 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The Fedora release under Bazzite stable, from its image's version label
+  # (44.20261012.1 is Fedora 44), so Achilles is built on the same one and
+  # moves to the next Fedora when Bazzite does. Both editions come from the
+  # same Bazzite build, so one image is enough.
+  fedora:
+    name: Read Bazzite's Fedora release
+    runs-on: ubuntu-26.04
+
+    permissions: {}
+
+    outputs:
+      release: ${{ steps.read.outputs.release }}
+
+    steps:
+      - name: Read Bazzite's version label
+        id: read
+        run: |
+          command -v skopeo > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq skopeo; }
+          version=$(skopeo inspect --retry-times 3 --no-tags \
+            --format '{{ index .Labels "org.opencontainers.image.version" }}' \
+            docker://ghcr.io/ublue-os/bazzite:stable)
+          release=${version%%.*}
+          if [[ ! "${release}" =~ ^[0-9]+$ ]]; then
+            echo "::error title=Unknown Fedora release::Bazzite stable's version label is '${version}', not <Fedora release>.<date>."
+            exit 1
+          fi
+          echo "Bazzite stable ${version}: Fedora ${release}"
+          echo "release=${release}" >> "${GITHUB_OUTPUT}"
+
   # Achilles, the desktop assistant, comes from the private mslanden/achilles
-  # at the commit in achilles.ref. It is built once, on Fedora 44 like Bazzite,
-  # and both editions install that binary. These logs are public and the source
-  # is not: the build's own output goes to a file that is never shown or
-  # uploaded, and only the binary and its icon leave this job.
+  # at the commit in achilles.ref. It is built once, on Bazzite's Fedora
+  # release, and both editions install that binary. These logs are public and
+  # the source is not: the build's own output goes to a file that is never
+  # shown or uploaded, and only the binary and its icon leave this job.
   achilles:
     name: Build Achilles
+    needs: fedora
     runs-on: ubuntu-26.04
-    container: registry.fedoraproject.org/fedora:44
+    container: registry.fedoraproject.org/fedora:${{ needs.fedora.outputs.release }}
 
     permissions:
       contents: read
@@ -155,16 +185,18 @@ jobs:
           restore-keys: npm-
 
       # Compiler errors quote source lines too, so a failure shows only the
-      # error headlines; build the pinned commit on Fedora 44 to see the rest.
+      # error headlines; build the pinned commit on Bazzite's Fedora release to
+      # see the rest.
       - name: Build Achilles
         if: steps.key.outputs.available == 'true'
         working-directory: achilles
         env:
           PIN: ${{ steps.pin.outputs.sha }}
+          FEDORA_RELEASE: ${{ needs.fedora.outputs.release }}
         run: |
           log="${RUNNER_TEMP}/achilles-build.log"
           if ! { npm ci && npm run tauri:build -- --no-bundle -- --locked; } > "${log}" 2>&1; then
-            echo "::error title=Achilles did not build::Its output stays out of this public log. Build commit ${PIN} of mslanden/achilles on Fedora 44 to see it."
+            echo "::error title=Achilles did not build::Its output stays out of this public log. Build commit ${PIN} of mslanden/achilles on Fedora ${FEDORA_RELEASE} to see it."
             grep -E '^error|^npm error|error TS[0-9]+:|system library' "${log}" | cut -c1-300 | head -n 40 || true
             exit 1
           fi

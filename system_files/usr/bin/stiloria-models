@@ -186,9 +186,17 @@ fetch() {
     mv -f "$part" "$target"
 }
 
+# What Kokoro's Python environment was made from: the requirements, and the
+# Python, since a venv only works with the Python that made it and the image
+# moves to a new one with each Fedora release.
+runtime_stamp() {
+    python3 -c 'import sys; print("Python %d.%d" % sys.version_info[:2])'
+    cat "$requirements"
+}
+
 # Kokoro's Python environment: onnxruntime and numpy wheels, hash-checked.
 install_runtime() {
-    if runtime_ready && cmp -s "$requirements" "$venv/.stiloria-requirements"; then
+    if runtime_ready && cmp -s <(runtime_stamp) "$venv/.stiloria-requirements"; then
         echo "Kokoro's Python runtime: already installed"
         return
     fi
@@ -200,7 +208,7 @@ install_runtime() {
         rm -rf "$venv"
         die "installing Kokoro's Python runtime failed. Run the same command again to retry."
     fi
-    cp "$requirements" "$venv/.stiloria-requirements"
+    runtime_stamp > "$venv/.stiloria-requirements"
 }
 
 install() {
