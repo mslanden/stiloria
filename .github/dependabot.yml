@@ -1,7 +1,8 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# Dependabot is Stiloria's one dependency updater: it opens pull requests
+# for the GitHub Actions the workflows use, which are pinned by commit SHA
+# with the version in a comment, and its pull requests update both. They
+# build without Achilles (they can't read its deploy key); see the README.
+# https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
 
 version: 2
 updates:

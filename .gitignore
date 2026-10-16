@@ -8,3 +8,5 @@ _build-*/**
 # job (see README). Ignored, so `just build` still sees a clean tree and labels
 # the image.
 /achilles/
+# Claude Code's worktrees and session files for this checkout.
+/.claude/

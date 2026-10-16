@@ -113,6 +113,15 @@ build $target_image=image_name $tag=default_tag:
         LABELS+=("--label" "org.opencontainers.image.source=https://github.com/{{ repo_organization }}/{{ image_name }}/blob/${GIT_SHA}/Containerfile")
         LABELS+=("--label" "org.opencontainers.image.url=https://github.com/{{ repo_organization }}/{{ image_name }}/tree/${GIT_SHA}")
         LABELS+=("--label" "org.opencontainers.image.version={{ default_tag }}.$(date +%Y%m%d)-${GIT_SHA}")
+        # The full commit; the daily build skips itself when the published
+        # image has this one and the same base digest (below).
+        LABELS+=("--label" "org.opencontainers.image.revision=$(git rev-parse HEAD)")
+    fi
+
+    # The workflow passes the base by the digest whose signature it checked.
+    if [[ "${BASE_IMAGE:-}" == *@sha256:* ]]; then
+        LABELS+=("--label" "org.opencontainers.image.base.name=${BASE_IMAGE%@*}")
+        LABELS+=("--label" "org.opencontainers.image.base.digest=${BASE_IMAGE#*@}")
     fi
 
     # Image metadata for https://artifacthub.io/ - This is optional but is highly recommended so we all can get a index of all the custom images
@@ -179,6 +188,17 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
 
     GRAPHROOT="$(podman info --format '{{ '{{.Store.GraphRoot}}' }}')"
 
+    # rpm-ostree writes a new image config with only its own labels (ostree.*
+    # and containers.bootc), so carry over the rest of the build's: the
+    # version, revision and base digest among them, which the daily build
+    # reads to skip a rebuild.
+    LABEL_ARGS=()
+    while IFS= read -r label; do
+        LABEL_ARGS+=("--label" "${label}")
+    done < <(podman inspect "${target_image}:${tag}" |
+        jq -r '.[0].Labels // {} | to_entries[] | select(.key | test("^(ostree\\.|containers\\.bootc$)") | not) | "\(.key)=\(.value)"')
+    test "${#LABEL_ARGS[@]}" -gt 0
+
     podman run --rm --pull=never --privileged \
       --mount=type=image,src="${target_image}:${tag}",target=/rpm-ostree \
       --mount=type=bind,src=${GRAPHROOT},target=/run/host-container-storage,rw \
@@ -189,6 +209,7 @@ ostree-rechunk $target_image=image_name $tag=default_tag:
       --max-layers 127 \
       --format-version=2 \
       --bootc \
+      "${LABEL_ARGS[@]}" \
       --rootfs /rpm-ostree \
       --output "containers-storage:[overlay@/run/host-container-storage+/run/rpm-ostree-storage]localhost/${target_image}:${tag}"
 

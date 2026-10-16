@@ -1,6 +1,7 @@
-# Base image for the AMD/Intel edition. The build workflow passes
-# ghcr.io/ublue-os/bazzite-nvidia-open:stable for the -nvidia edition.
-# Tracks the stable tag, so each daily build picks up the latest Bazzite.
+# Base image for the AMD/Intel edition, for local builds. The build workflow
+# passes each edition's base (bazzite or bazzite-nvidia-open, stable) by
+# digest, once it has checked Universal Blue's signature on it, so each daily
+# build picks up the latest Bazzite but only a signed one.
 ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable
 
 # Allow build scripts to be referenced without being copied into the final image
