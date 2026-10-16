@@ -174,7 +174,7 @@ jobs:
           echo "Node $(node --version), npm $(npm --version)"
           rpm -q webkit2gtk4.1-devel gtk3-devel
 
-      # These stage versions are pinned by https://github.com/renovatebot/renovate
+      # Dependabot keeps these actions' pins current (.github/dependabot.yml)
       - name: Check out achilles.ref
         if: steps.key.outputs.available == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -312,7 +312,7 @@ jobs:
       id-token: write
 
     steps:
-      # These stage versions are pinned by https://github.com/renovatebot/renovate
+      # Dependabot keeps these actions' pins current (.github/dependabot.yml)
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
