@@ -2,11 +2,16 @@
 Description=Install Stiloria's recommended apps
 Wants=network-online.target
 After=network-online.target bazzite-flatpak-manager.service
+# Retries stop after 12 tries, about an hour, until the next boot, so an app
+# that keeps failing isn't retried all day.
+StartLimitIntervalSec=2h
+StartLimitBurst=12
 
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/stiloria-flatpak-manager
-# No network yet, or Flathub briefly down: try again in a few minutes.
+# No network yet, Flathub briefly down, or an app failed: try again in a few
+# minutes.
 Restart=on-failure
 RestartSec=5min
 
