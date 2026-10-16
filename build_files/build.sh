@@ -33,11 +33,11 @@ sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Stiloria"/' /usr/lib/os-release
 sed -i 's/^DEFAULT_HOSTNAME=.*/DEFAULT_HOSTNAME="stiloria"/' /usr/lib/os-release
 grep -qx 'DEFAULT_HOSTNAME="stiloria"' /usr/lib/os-release
 
-# New accounts get Stiloria's wallpaper through the Steam-style Plasma themes
-# Bazzite uses, and the lock screen shows it too; existing accounts get it once
-# from stiloria-user-setup. If Bazzite moves these, fail the build rather than
-# quietly keep its wallpaper.
-wallpaper=/usr/share/wallpapers/Stiloria/contents/images/3840x2160.jpg
+# New accounts get Stiloria's wallpaper, the bronze helmet, through the
+# Steam-style Plasma themes Bazzite uses, and the lock and login screens show
+# it too; existing accounts get it once from stiloria-user-setup. If Bazzite
+# moves these, fail the build rather than quietly keep its wallpaper.
+wallpaper=/usr/share/wallpapers/Stiloria-Helmet/contents/images/3840x2160.jpg
 test -f "$wallpaper"
 for file in /usr/share/plasma/look-and-feel/com.valve.{vapor,vgui}.desktop/contents/plasmoidsetupscripts/org.kde.plasma.folder.js \
     /etc/xdg/kscreenlockerrc; do
@@ -107,10 +107,12 @@ test -z "$(grep -s '^DefaultProfile=' /etc/xdg/konsolerc)"
 # StiloriaDay and Stiloria; tools/make_plasma_style.py and tools/make_colors.py
 # generate them. Plasma's own switcher (the
 # lookandfeelautoswitcher kded module) changes between them at sunrise and
-# sunset, and the Stiloria wallpaper package has a night image
-# (contents/images_dark) that Plasma shows with the night colors. New accounts
-# start in Stiloria Day with a floating panel and the switcher on; existing
-# accounts move over once in stiloria-user-setup.
+# sunset. Their wallpaper is the Stiloria Helmet, dark by day and night alike,
+# so their layout sets the desktop greeting to ivory text at all hours. (The
+# Stiloria sky city in the picker has a night image, contents/images_dark,
+# that Plasma shows with the night colors.) New accounts start in Stiloria Day
+# with a floating panel and the switcher on; existing accounts move over once
+# in stiloria-user-setup.
 for file in /usr/share/color-schemes/StiloriaDay.colors /usr/share/color-schemes/Stiloria.colors \
     /usr/share/plasma/desktoptheme/stiloria/metadata.json \
     /usr/share/plasma/look-and-feel/com.stiloria.{day,night}.desktop/metadata.json \
@@ -124,10 +126,10 @@ for line in LookAndFeelPackage=com.stiloria.day.desktop AutomaticLookAndFeel=tru
     DefaultLightLookAndFeel=com.stiloria.day.desktop DefaultDarkLookAndFeel=com.stiloria.night.desktop; do
     test "$(grep -cx "$line" /etc/xdg/kdeglobals)" = 1
 done
-# The lock screen names the wallpaper package rather than its day image, so it
-# turns to night with the desktop.
-sed -i "s|=$wallpaper\$|=/usr/share/wallpapers/Stiloria/|" /etc/xdg/kscreenlockerrc
-test "$(grep -c '=/usr/share/wallpapers/Stiloria/$' /etc/xdg/kscreenlockerrc)" = 2
+# The lock screen names the wallpaper package, as the desktop does, rather
+# than its image file.
+sed -i "s|=$wallpaper\$|=/usr/share/wallpapers/Stiloria-Helmet/|" /etc/xdg/kscreenlockerrc
+test "$(grep -c '=/usr/share/wallpapers/Stiloria-Helmet/$' /etc/xdg/kscreenlockerrc)" = 2
 # Folders in Porcelain's stone instead of the slate accent: two icon themes,
 # Stiloria and Stiloria-Dark, that inherit Breeze and Breeze Dark and replace
 # only the accent-filled folder icons, made here from the image's own Breeze

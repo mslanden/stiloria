@@ -3,7 +3,9 @@
     the Porcelain design. The date and time as an overline, "Good evening,"
     and the user's first name, in italics, in Instrument Serif, and how to
     talk to Achilles. Ink when the color scheme is light (day), ivory when it
-    is dark (night), with a soft glow or shadow so it reads over the wallpaper.
+    is dark (night), with a soft glow or shadow so it reads over the wallpaper;
+    or always ivory, or always ink, when its settings say so (Stiloria's dark
+    Helmet wallpaper asks for ivory all day).
 
     The layout is the design's (porcelain.html) at 1x; the widget scales
     it to fit its size. It wakes once a minute, on the minute, for the clock,
@@ -29,10 +31,13 @@ PlasmoidItem {
 
     // Day or night, from the color scheme's window background: Plasma swaps
     // the scheme when it switches between its light and dark themes, and the
-    // text follows right away.
+    // text follows right away. The Text setting can fix it to one or the
+    // other, for a wallpaper that stays dark (or light) all day.
     Kirigami.Theme.colorSet: Kirigami.Theme.Window
     Kirigami.Theme.inherit: false
-    readonly property bool dark: Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
+    readonly property bool dark: Plasmoid.configuration.textColor === "light" ? true
+        : Plasmoid.configuration.textColor === "dark" ? false
+        : Kirigami.ColorUtils.brightnessForColor(Kirigami.Theme.backgroundColor) === Kirigami.ColorUtils.Dark
 
     // Porcelain's colors: ink for the text (the date at 78%, the hint at 85%),
     // and for the keys a surface fill with a hairline edge.
