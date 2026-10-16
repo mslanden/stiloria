@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+# Makes the key that stiloria-bonsai.service and stiloria-voice-model.service
+# require (llama-server's --api-key-file), once per user: a random key in the
+# file given, readable only by its owner. Achilles reads it from there and
+# sends it with each request. A file that already holds a key is kept.
+set -euo pipefail
+
+file=$1
+umask 077
+mkdir -p "${file%/*}"
+# One at a time, as both services may start at once.
+exec {lock}<"${file%/*}"
+flock "$lock"
+
+# llama-server skips blank lines and # comments, and with no key left it
+# would take any request.
+grep -q '^[^#]' "$file" 2>/dev/null && exit 0
+
+new=$(mktemp "$file.XXXXXX")
+trap 'rm -f "$new"' EXIT
+# 32 random bytes as 64 hex digits, on a line of their own.
+printf '%s\n' "$(od -An -vtx1 -N32 /dev/urandom | tr -d ' \n')" > "$new"
+mv -f "$new" "$file"
