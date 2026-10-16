@@ -262,6 +262,19 @@ if [[ $status != 124 ]] || grep -E "plasmoids/com.stiloria.greeting|error when l
     exit 1
 fi
 
+### Existing accounts: stiloria-user-setup
+# It talks to Plasma with Qt 6's qdbus-qt6. Plain qdbus is Qt 4's (Fedora's
+# qt package), which Bazzite could drop at any time; fail if a step uses it.
+command -v qdbus-qt6
+test -z "$(grep -nE '(^|[[:space:]])qdbus[[:space:]]' /usr/libexec/stiloria-user-setup)"
+# Each account remembers only the last step it ran, so a missing number would
+# be skipped for good by every account past it: the steps must be 1, 2, 3, …
+steps=$(grep -oP '^if \(\(done_steps < \K[0-9]+(?=\)\); then$)' /usr/libexec/stiloria-user-setup)
+if [[ $steps != "$(seq "$(wc -l <<< "$steps")")" ]]; then
+    echo "stiloria-user-setup's steps aren't numbered 1, 2, 3, … with none missing: ${steps//$'\n'/, }" >&2
+    exit 1
+fi
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.

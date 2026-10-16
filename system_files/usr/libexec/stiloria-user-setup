@@ -14,7 +14,7 @@ done_with() {
 # Plasma may still be starting when autostart runs; wait for it a little, and
 # if it never answers, try again at the next login.
 for _ in $(seq 1 20); do
-    qdbus org.kde.plasmashell /PlasmaShell >/dev/null 2>&1 && ready=1 && break
+    qdbus-qt6 org.kde.plasmashell /PlasmaShell >/dev/null 2>&1 && ready=1 && break
     sleep 3
 done
 [[ -n ${ready:-} ]] || exit 0
@@ -30,7 +30,7 @@ fi
 
 # 2: the start-menu button shows the Stiloria helmet
 if ((done_steps < 2)); then
-    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+    qdbus-qt6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
         panels().forEach(function (panel) {
             panel.widgets("org.kde.plasma.kickoff").forEach(function (launcher) {
                 launcher.currentConfigGroup = ["General"];
@@ -52,7 +52,9 @@ fi
 # 4: Stiloria Day and Night. The look follows the time of day with Plasma's
 # automatic theme switching, starting with whichever fits now; the wallpaper and
 # lock screen name the Stiloria Helmet package; and the bottom panel floats. The
-# panel's layout and apps are left as they are.
+# panel's layout and apps are left as they are. Without -k,
+# plasma-apply-lookandfeel would turn the automatic switching off again in the
+# account's own settings.
 if ((done_steps < 4)); then
     kwriteconfig6 --file kdeglobals --group KDE --key DefaultLightLookAndFeel com.stiloria.day.desktop
     kwriteconfig6 --file kdeglobals --group KDE --key DefaultDarkLookAndFeel com.stiloria.night.desktop
@@ -60,12 +62,12 @@ if ((done_steps < 4)); then
     hour=$(date +%-H)
     look=com.stiloria.night.desktop
     ((hour >= 7 && hour < 19)) && look=com.stiloria.day.desktop
-    plasma-apply-lookandfeel -a "$look" >/dev/null 2>&1 || exit 0
+    plasma-apply-lookandfeel -k -a "$look" >/dev/null 2>&1 || exit 0
     plasma-apply-wallpaperimage /usr/share/wallpapers/Stiloria-Helmet >/dev/null 2>&1 || exit 0
     for key in Image PreviewImage; do
         kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key "$key" /usr/share/wallpapers/Stiloria-Helmet/
     done
-    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+    qdbus-qt6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
         panels().forEach(function (panel) {
             if (panel.location == "bottom") panel.floating = true;
         });' >/dev/null || exit 0
@@ -76,7 +78,7 @@ fi
 # widget is installed this step waits, trying again at the next login.
 if ((done_steps < 5)); then
     [[ -d /usr/share/plasma/plasmoids/com.stiloria.greeting ]] || exit 0
-    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+    qdbus-qt6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
         var desktop = desktopForScreen(0);
         if (desktop.widgets("com.stiloria.greeting").length === 0) {
             desktop.addWidget("com.stiloria.greeting", 96, 64, 640, 304);
@@ -90,7 +92,7 @@ fi
 # on a desktop that shows the helmet is set to ivory text, since the helmet's
 # wall stays dark while the day colors are on.
 if ((done_steps < 6)); then
-    qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+    qdbus-qt6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
         var skyCity = /^(file:\/\/)?\/usr\/share\/wallpapers\/Stiloria(\/|\/contents\/images\/3840x2160\.jpg)?$/;
         var helmet = /^(file:\/\/)?\/usr\/share\/wallpapers\/Stiloria-Helmet(\/|\/contents\/images\/3840x2160\.jpg)?$/;
         desktops().forEach(function (desktop) {
@@ -117,4 +119,19 @@ if ((done_steps < 6)); then
         done
     fi
     done_with 6
+fi
+
+# 7: day/night switching back on. Step 4 used to run plasma-apply-lookandfeel
+# without -k, which wrote AutomaticLookAndFeel=false into the account's own
+# kdeglobals, so the look stayed as it was at that login. Turning it on with
+# --notify tells Plasma's switcher right away; removing the line then leaves
+# Stiloria's default (/etc/xdg/kdeglobals, on) in charge. kwriteconfig6
+# --delete can't do that: it writes a deletion marker that hides the default
+# too. Someone who had turned the switching off on purpose needs to do so
+# again, in System Settings → Global Theme.
+if ((done_steps < 7)); then
+    kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel --notify true
+    kdeglobals=${XDG_CONFIG_HOME:-$HOME/.config}/kdeglobals
+    [[ -f $kdeglobals ]] && sed -i '/^\[KDE\]$/,/^\[/{/^AutomaticLookAndFeel=/d}' "$kdeglobals"
+    done_with 7
 fi
