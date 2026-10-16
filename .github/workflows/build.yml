@@ -16,9 +16,13 @@ on:
 env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
+# A newer push to a pull request replaces the build in progress. On main a
+# build runs to the end, since one cancelled between pushing and signing would
+# leave `latest` unsigned, which Stiloria refuses to update to; a newer one
+# waits its turn instead.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.brand_name}}-${{ inputs.stream_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Achilles, the desktop assistant, comes from the private mslanden/achilles
