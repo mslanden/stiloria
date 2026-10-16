@@ -7,18 +7,22 @@ Description=Main model for Achilles (Ternary Bonsai 2 27B, 127.0.0.1:8085)
 Type=exec
 # Fails the start, telling the user what to install, if a model file is missing.
 ExecStartPre=/usr/bin/stiloria-models check bonsai
+# The key it requires, made the first time for each user.
+ExecStartPre=/usr/libexec/stiloria-llama-api-key %S/stiloria/llama-api-key
 # "-c auto": 65536 tokens on GPUs with 16 GB or more, else 32768; see
 # /usr/libexec/stiloria-llama-server.
 # Achilles is its only client, and calls it from its own process, not from a
 # web page: so no web UI and no /slots, and no website open in a browser may
 # read its answers (llama-server's default CORS lets any site do so); with no
-# web UI, nothing is served from the one origin allowed. No API key, as
-# Achilles doesn't send one.
+# web UI, nothing is served from the one origin allowed. And everything but
+# /health needs the key Achilles sends, so a website can't have it run a
+# request at all, even one whose answer it can't read.
 ExecStart=/usr/libexec/stiloria-llama-server \
     -m %D/stiloria/models/Ternary-Bonsai-2-27B-PQ2_0.gguf \
     --mmproj %D/stiloria/models/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf \
     --host 127.0.0.1 --port 8085 --alias bonsai-2-27b \
     --no-webui --no-slots --cors-origins http://127.0.0.1:8085 \
+    --api-key-file %S/stiloria/llama-api-key \
     -ngl 999 -fa on -c auto -np 1 -ctk q8_0 -ctv q8_0 \
     --image-min-tokens 1024 \
     --spec-type ngram-simple --spec-ngram-simple-size-n 8 --spec-ngram-simple-size-m 24 \
