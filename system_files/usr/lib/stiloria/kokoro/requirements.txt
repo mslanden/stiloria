@@ -1,9 +1,13 @@
 # The Python packages server.py needs, installed by `stiloria-models install tts`
 # into ~/.local/share/stiloria/kokoro-venv with pip --require-hashes --no-deps.
-# Wheels for the image's Python 3.14 (build.sh checks the version). onnxruntime
-# lists flatbuffers, packaging and protobuf as dependencies, but running a model
-# on the CPU doesn't import them.
+# Each hash is one wheel, built for one Python, and pip takes the one for the
+# image's: build.sh installs them the same way, so when Bazzite moves to a new
+# Python the build fails until its wheels are added here. numpy's are for
+# Python 3.14 and 3.15; onnxruntime 1.31.0 has none for 3.15 yet, only 3.14.
+# onnxruntime lists flatbuffers, packaging and protobuf as dependencies, but
+# running a model on the CPU doesn't import them.
 numpy==2.5.4 \
-    --hash=sha256:d549420b8858885cea8838a727842249218b9c1da24dd517e25c9c7a948310a3
+    --hash=sha256:d549420b8858885cea8838a727842249218b9c1da24dd517e25c9c7a948310a3 \
+    --hash=sha256:56733449d2544178beaa4545cee357370440cf056c197f9c7bfb19dbfdd0e86d
 onnxruntime==1.31.0 \
     --hash=sha256:e4efa4a1a0bb0b5173c6a3292c181d518b8323f9d56e978635d0c09d38c94d1a

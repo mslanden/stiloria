@@ -22,7 +22,26 @@ fi
 
 # Bazzite's flatpak manager sets up the Flathub remote; make sure it exists anyway.
 flatpak remote-add --if-not-exists --system flathub /etc/flatpak/remotes.d/flathub.flatpakrepo || :
-# On failure (no network yet) nothing is recorded, and the service retries.
-flatpak install --system --noninteractive --or-update flathub "${new[@]}"
-printf '%s\n' "${new[@]}" >> "$offered"
-echo "Installed: ${new[*]}"
+# The apps Flathub has. Without it (no network yet) nothing is recorded, and
+# the service tries again.
+available=$(flatpak remote-ls --system --app --columns=application flathub)
+
+# One app at a time, so one that fails doesn't hold back the others. An app
+# Flathub doesn't have (renamed, retired, or a typo in the list) would fail
+# every time, so it counts as offered; any other failure is tried again.
+failed=()
+for app in "${new[@]}"; do
+    if ! grep -qxF "$app" <<< "$available"; then
+        echo "Not on Flathub, skipped: $app"
+    elif flatpak install --system --noninteractive --or-update flathub "$app"; then
+        echo "Installed: $app"
+    else
+        failed+=("$app")
+        continue
+    fi
+    echo "$app" >> "$offered"
+done
+if ((${#failed[@]})); then
+    echo "Failed, to be tried again: ${failed[*]}" >&2
+    exit 1
+fi

@@ -223,11 +223,22 @@ test "$(as_user voxtype --version)" = "voxtype $voxtype_version"
 # Text to speech: Kokoro on the CPU, so the GPU stays with games and the
 # language models. Its server (system_files/usr/lib/stiloria/kokoro) turns text
 # into phonemes with espeak-ng, and stiloria-models installs the onnxruntime
-# and numpy wheels pinned in requirements.txt, which are built for Python 3.14:
-# when Bazzite moves to a newer Python, update them, and this check.
+# and numpy wheels pinned in requirements.txt. Each wheel is built for one
+# Python, so install them here the way stiloria-models does, and import them:
+# when Bazzite moves to a new Python, the build fails until requirements.txt
+# has its wheels, rather than shipping text to speech that can't install.
 rpm -q espeak-ng || dnf5 install -y espeak-ng
 test -e /usr/lib64/libespeak-ng.so.1
-python3 -c 'import sys; assert sys.version_info[:2] == (3, 14), sys.version'
+kokoro_check=$(mktemp -d)
+chown nobody: "$kokoro_check"
+as_user env HOME="$kokoro_check" python3 -m venv "$kokoro_check/venv"
+if ! as_user env HOME="$kokoro_check" "$kokoro_check/venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
+    --no-deps --only-binary=:all: --require-hashes -r /usr/lib/stiloria/kokoro/requirements.txt; then
+    echo "pip couldn't install Kokoro's requirements.txt (above). If it lacks wheels for this image's $(python3 --version), add them (see the file)." >&2
+    exit 1
+fi
+as_user env ORT_DISABLE_TELEMETRY=1 "$kokoro_check/venv/bin/python" -c 'import numpy, onnxruntime'
+rm -rf "$kokoro_check"
 as_user stiloria-models --help > /dev/null
 
 ### Desktop greeting
@@ -262,6 +273,19 @@ if [[ $status != 124 ]] || grep -E "plasmoids/com.stiloria.greeting|error when l
     exit 1
 fi
 
+### Existing accounts: stiloria-user-setup
+# It talks to Plasma with Qt 6's qdbus-qt6. Plain qdbus is Qt 4's (Fedora's
+# qt package), which Bazzite could drop at any time; fail if a step uses it.
+command -v qdbus-qt6
+test -z "$(grep -nE '(^|[[:space:]])qdbus[[:space:]]' /usr/libexec/stiloria-user-setup)"
+# Each account remembers only the last step it ran, so a missing number would
+# be skipped for good by every account past it: the steps must be 1, 2, 3, …
+steps=$(grep -oP '^if \(\(done_steps < \K[0-9]+(?=\)\); then$)' /usr/libexec/stiloria-user-setup)
+if [[ $steps != "$(seq "$(wc -l <<< "$steps")")" ]]; then
+    echo "stiloria-user-setup's steps aren't numbered 1, 2, 3, … with none missing: ${steps//$'\n'/, }" >&2
+    exit 1
+fi
+
 ### Install packages
 
 # Packages can be installed from any enabled yum repo on the image.
@@ -285,9 +309,10 @@ systemctl enable podman.socket
 
 ### Achilles, Stiloria's desktop assistant (see "Achilles" in the README)
 # The workflow's achilles job builds it from the private mslanden/achilles, at
-# the commit in achilles.ref, on Fedora 44 like this image, and hands over only
-# the binary and its icon. Pull requests that can't read the deploy key (from
-# forks, or Dependabot) build without it, and achilles/skipped says so.
+# the commit in achilles.ref, on the Fedora release Bazzite is built on, and
+# hands over only the binary and its icon. Pull requests that can't read the
+# deploy key (from forks, or Dependabot) build without it, and
+# achilles/skipped says so.
 if [[ -f /ctx/achilles/skipped ]]; then
     echo "Building without Achilles: $(< /ctx/achilles/skipped)"
 elif [[ ! -f /ctx/achilles/achilles ]]; then
@@ -335,8 +360,8 @@ OnlyShowIn=KDE;
 EOF
     desktop-file-validate /usr/share/applications/com.stiloria.desktop /etc/xdg/autostart/achilles.desktop
 
-    # Achilles was linked against Fedora 44's libraries, not this image's: fail
-    # if Bazzite lacks one, or has an older one than it needs.
+    # Achilles was linked against plain Fedora's libraries, not this image's:
+    # fail if Bazzite lacks one, or has an older one than it needs.
     ldd /usr/bin/achilles > /tmp/achilles-libs 2>&1
     if grep 'not found' /tmp/achilles-libs; then
         echo "Achilles needs libraries this image lacks (above)" >&2
