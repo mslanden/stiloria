@@ -4,7 +4,7 @@
 
 A Linux for gaming and AI, built on [Bazzite](https://bazzite.gg) with the KDE Plasma desktop. Stiloria is the home of **Achilles**, a local voice assistant for controlling the PC.
 
-Stiloria is an image-based (bootc) system: this repo is the recipe, and GitHub Actions builds it daily on top of the latest Bazzite stable. Installed machines update to new builds automatically, and the previous version can be picked from the boot menu if an update misbehaves.
+Stiloria is an image-based (bootc) system: this repo is the recipe, and GitHub Actions builds it on top of the latest Bazzite stable whenever the image's files here change, and whenever Bazzite does (checked daily). Installed machines update to new builds automatically, and the previous version can be picked from the boot menu if an update misbehaves.
 
 ## Install
 

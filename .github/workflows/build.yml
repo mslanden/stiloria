@@ -6,11 +6,20 @@ on:
       - main
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
+  # Only pushes skip files the image doesn't use: pull requests always build,
+  # since branch protection waits for these jobs.
   push:
     branches:
       - main
     paths-ignore:
       - '**/README.md'
+      - 'LICENSE'
+      - 'branding/**'  # the README's logo; the image has its own copies
+      - 'tools/**'  # generators of files in system_files, which are committed
+      - 'installer/**'  # build-disk.yml's
+      - 'disk_config/**'  # the Justfile's local VM builds
+      - '.github/workflows/build-disk.yml'
+      - '.github/dependabot.yml'
   workflow_dispatch:
 
 env:
@@ -30,7 +39,8 @@ jobs:
   # the digest checked, so a tag moved in between can't slip in another image.
   # The Fedora release under it, from its version label (44.20261012.1 is
   # Fedora 44), is the one Achilles is built on, so it moves to the next
-  # Fedora when Bazzite does.
+  # Fedora when Bazzite does. And the daily build stops here when there is
+  # nothing new to build.
   bazzite:
     name: Check Bazzite's images
     runs-on: ubuntu-26.04
@@ -42,14 +52,17 @@ jobs:
       release: ${{ steps.read.outputs.release }}
       amd_intel: ${{ steps.verify.outputs.amd_intel }}
       nvidia: ${{ steps.verify.outputs.nvidia }}
+      build: ${{ steps.changed.outputs.build || 'true' }}
 
     steps:
-      - name: Check out Universal Blue's keys
+      - name: Check out the signing keys and image name
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: |
             .github/ublue-os.pub
             .github/ublue-os-backup.pub
+            cosign.pub
+            image-template.env
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
@@ -104,6 +117,45 @@ jobs:
           echo "Bazzite stable ${version}: Fedora ${release}"
           echo "release=${release}" >> "${GITHUB_OUTPUT}"
 
+      # The daily build is there to pick up a new Bazzite. When both published
+      # images are signed and their labels (set by `just build`) name this
+      # commit and these same base digests, it has nothing new to build, and
+      # the other jobs are skipped. Anything unexpected, such as a missing
+      # label, an unsigned image or a registry error, means build. Pushes and
+      # manual runs always build.
+      - name: Compare with the published images
+        id: changed
+        if: github.event_name == 'schedule'
+        env:
+          AMD_INTEL: ${{ steps.verify.outputs.amd_intel }}
+          NVIDIA: ${{ steps.verify.outputs.nvidia }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          image=${IMAGE_REGISTRY,,}/$(. ./image-template.env && echo "${IMAGE_NAME,,}")
+          unchanged() {
+            local digest labels
+            if ! digest=$(cosign verify --key cosign.pub "$1:latest" 2> /dev/null |
+              jq -er '.[0].critical.image."docker-manifest-digest"'); then
+              echo "$1:latest has no valid signature: building."
+              return 1
+            fi
+            labels=$(skopeo inspect --retry-times 3 --no-tags "docker://$1@${digest}" | jq -c .Labels)
+            if [[ "$(jq -r '."org.opencontainers.image.revision" // ""' <<< "${labels}")" != "${REVISION}" ]]; then
+              echo "$1:latest (${digest}) was built from another commit: building."
+              return 1
+            fi
+            if [[ "$(jq -r '."org.opencontainers.image.base.digest" // ""' <<< "${labels}")" != "${2#*@}" ]]; then
+              echo "$1:latest (${digest}) was built on another Bazzite: building."
+              return 1
+            fi
+            echo "$1:latest (${digest}) is ${REVISION} on ${2}."
+          }
+          if unchanged "${image}" "${AMD_INTEL}" && unchanged "${image}-nvidia" "${NVIDIA}"; then
+            echo "::notice title=Nothing new to build::Both published images are already commit ${REVISION} on today's Bazzite."
+            echo "build=false" >> "${GITHUB_OUTPUT}"
+          fi
+
   # Achilles, the desktop assistant, comes from the private mslanden/achilles
   # at the commit in achilles.ref. It is built once, on Bazzite's Fedora
   # release, and both editions install that binary. These logs are public and
@@ -112,6 +164,8 @@ jobs:
   achilles:
     name: Build Achilles
     needs: bazzite
+    # When this job is skipped, build_push, which needs it, is skipped too.
+    if: needs.bazzite.outputs.build == 'true'
     runs-on: ubuntu-26.04
     container: registry.fedoraproject.org/fedora:${{ needs.bazzite.outputs.release }}
 
@@ -309,7 +363,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
 
     steps:
       # Dependabot keeps these actions' pins current (.github/dependabot.yml)
