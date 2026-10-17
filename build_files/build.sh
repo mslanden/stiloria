@@ -241,6 +241,36 @@ as_user env ORT_DISABLE_TELEMETRY=1 "$kokoro_check/venv/bin/python" -c 'import n
 rm -rf "$kokoro_check"
 as_user stiloria-models --help > /dev/null
 
+### Vivaldi, from Vivaldi's own RPM repository
+# Each build installs the latest Vivaldi, so it updates with the image: the
+# repository goes again afterwards, with the daily cron job that would add it
+# back. The RPM installs into /opt/vivaldi, but /opt links to /var/opt, which
+# bootc fills from the image only once, at the first deployment, so newer
+# Vivaldis would never arrive. It moves to /usr/lib/opt/vivaldi instead, and a
+# tmpfiles link at each boot keeps /opt/vivaldi working for the paths that name
+# it (/usr/bin/vivaldi-stable, Vivaldi's own scripts). Its proprietary media
+# codecs aren't in the RPM: Vivaldi fetches them into each user's home on its
+# first start.
+test -L /opt
+mkdir -p /var/opt
+cat > /etc/yum.repos.d/vivaldi.repo <<'EOF'
+[vivaldi]
+name=vivaldi
+baseurl=https://repo.vivaldi.com/archive/rpm/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://repo.vivaldi.com/archive/linux_signing_key.pub
+EOF
+dnf5 install -y vivaldi-stable
+rm /etc/yum.repos.d/vivaldi.repo /etc/cron.daily/vivaldi
+install -d -m755 /usr/lib/opt
+mv /var/opt/vivaldi /usr/lib/opt/vivaldi
+echo 'L+ /var/opt/vivaldi - - - - /usr/lib/opt/vivaldi' > /usr/lib/tmpfiles.d/stiloria-vivaldi.conf
+test "$(readlink /usr/bin/vivaldi-stable)" = /opt/vivaldi/vivaldi
+test -z "$(ldd /usr/lib/opt/vivaldi/vivaldi-bin | grep 'not found')"
+grep -qx "Vivaldi $(rpm -q --qf '%{VERSION}' vivaldi-stable) *" <<< "$(as_user /usr/lib/opt/vivaldi/vivaldi-bin --version)"
+desktop-file-validate /usr/share/applications/vivaldi-stable.desktop
+
 ### Desktop greeting
 # The greeting sets the date in Instrument Sans and "Good evening, Marcelino."
 # in Instrument Serif, which ship with the Porcelain look above; fail if
