@@ -10,3 +10,6 @@ com.heroicgameslauncher.hgl
 com.obsproject.Studio
 # Windows programs that aren't games.
 com.usebottles.bottles
+# Virtual machines, on the QEMU/KVM and libvirt in the image (see "Virtual
+# machines" in the README). Its QEMU extension isn't needed for those.
+org.virt_manager.virt-manager
