@@ -271,6 +271,48 @@ test -z "$(ldd /usr/lib/opt/vivaldi/vivaldi-bin | grep 'not found')"
 grep -qx "Vivaldi $(rpm -q --qf '%{VERSION}' vivaldi-stable) *" <<< "$(as_user /usr/lib/opt/vivaldi/vivaldi-bin --version)"
 desktop-file-validate /usr/share/applications/vivaldi-stable.desktop
 
+### Virtual machines: QEMU/KVM with the system's libvirt
+# Bazzite leaves VMs to `ujust setup-virtualization`, which installs
+# virt-manager as a Flatpak with its own QEMU: VMs then run in the Flatpak's
+# user session (qemu:///session), on slow user-mode networking, and can't be
+# given host devices. Stiloria ships QEMU and libvirt's daemons in the image
+# instead (about 210 MB on top of Bazzite), so virt-manager, the Flatpak from
+# the recommended apps, finds qemu:///system: virtio networking on libvirt's
+# NAT network "default", UEFI with Secure Boot and a software TPM for Windows
+# 11 (edk2-ovmf, swtpm), shared folders (virtiofsd), and USB and PCI devices
+# passed through. Fedora's modular daemons are socket-activated, so nothing
+# runs until virt-manager or virsh connects.
+dnf5 install -y --setopt=install_weak_deps=False \
+    qemu-kvm libvirt-daemon-kvm libvirt-daemon-config-network libvirt-client \
+    swtpm-tools virtiofsd edk2-ovmf
+virt_daemons=(virtqemud virtnetworkd virtstoraged virtnodedevd virtsecretd virtinterfaced virtnwfilterd virtproxyd)
+for daemon in "${virt_daemons[@]}"; do
+    systemctl enable "$daemon.socket" "$daemon-ro.socket" "$daemon-admin.socket"
+    test "$(systemctl is-enabled "$daemon.socket")" = enabled
+done
+test -L /etc/libvirt/qemu/networks/autostart/default.xml
+# ujust setup-virtualization enables the older, all-in-one libvirtd when it is
+# installed, and it would then fight these daemons over the same VMs. It isn't:
+# keep it that way.
+test ! -e /usr/lib/systemd/system/libvirtd.service
+# libvirt and swtpm keep their state in /var, which bootc fills from the image
+# only at the first deployment, so on a machine updating to this image the
+# folders would be missing, swtpm's certificate authority among them, without
+# which no VM gets a TPM. A tmpfiles entry for each folder these packages own
+# makes it at boot, with the package's owner and mode.
+rpm -q --qf '[%{FILEMODES:octal} %{FILEUSERNAME} %{FILEGROUPNAME} %{FILENAMES}\n]' \
+    $(rpm -qa --qf '%{NAME}\n' | grep -E '^(libvirt|qemu|swtpm)') |
+    awk '$1 ~ /^40/ && $4 ~ /^\/var\// { printf "d %s %s %s %s -\n", $4, substr($1, length($1) - 3), $2, $3 }' |
+    sort -u -k2,2 > /usr/lib/tmpfiles.d/stiloria-libvirt.conf
+grep -qx 'd /var/lib/swtpm-localca 0750 tss root -' /usr/lib/tmpfiles.d/stiloria-libvirt.conf
+grep -qx 'd /var/lib/libvirt/qemu 0751 qemu qemu -' /usr/lib/tmpfiles.d/stiloria-libvirt.conf
+# Windows' firmware for Secure Boot, with Microsoft's keys enrolled, and its TPM.
+test -f /usr/share/edk2/ovmf/OVMF_CODE_4M.secboot.qcow2
+test -f /usr/share/edk2/ovmf/OVMF_VARS_4M.secboot.qcow2
+command -v swtpm_setup
+as_user virsh --version > /dev/null
+as_user /usr/sbin/virtqemud --version > /dev/null
+
 ### Desktop greeting
 # The greeting sets the date in Instrument Sans and "Good evening, Marcelino."
 # in Instrument Serif, which ship with the Porcelain look above; fail if
