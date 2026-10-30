@@ -425,4 +425,11 @@ EOF
     echo "$out"
     test "$status" = 1
     grep -q "Achilles isn't running" <<< "$out"
+
+    # Its notch, the bar at the top of the screen that offers actions for the
+    # page open in the browser, is a layer-shell window: Achilles loads
+    # gtk-layer-shell for it when its browser extension first connects,
+    # rather than linking it, so the ldd check above can't see it.
+    dnf5 install -y gtk-layer-shell
+    test -f /usr/lib64/libgtk-layer-shell.so.0
 fi
