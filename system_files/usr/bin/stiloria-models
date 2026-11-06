@@ -7,6 +7,9 @@ data=${XDG_DATA_HOME:-$HOME/.local/share}
 models=$data/stiloria/models
 venv=$data/stiloria/kokoro-venv
 requirements=/usr/lib/stiloria/kokoro/requirements.txt
+# The Python Kokoro's environment is made with: the one onnxruntime has wheels
+# for, which can be older than the system's python3 (build.sh installs it).
+kokoro_python=/usr/bin/python3.14
 
 # component|folder|file|bytes|sha256|url. Hugging Face files are pinned to a
 # commit of their repository; the checksums are the ones Hugging Face and
@@ -190,7 +193,7 @@ fetch() {
 # Python, since a venv only works with the Python that made it and the image
 # moves to a new one with each Fedora release.
 runtime_stamp() {
-    python3 -c 'import sys; print("Python %d.%d" % sys.version_info[:2])'
+    "$kokoro_python" -c 'import sys; print("Python %d.%d" % sys.version_info[:2])'
     cat "$requirements"
 }
 
@@ -202,7 +205,7 @@ install_runtime() {
     fi
     echo "Kokoro's Python runtime: installing onnxruntime and numpy into ${venv/#$HOME/\~}"
     rm -rf "$venv"
-    python3 -m venv "$venv"
+    "$kokoro_python" -m venv "$venv"
     if ! "$venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
         --no-deps --only-binary=:all: --require-hashes -r "$requirements"; then
         rm -rf "$venv"
