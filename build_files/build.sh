@@ -229,12 +229,16 @@ test "$(as_user voxtype --version)" = "voxtype $voxtype_version"
 # has its wheels, rather than shipping text to speech that can't install.
 rpm -q espeak-ng || dnf5 install -y espeak-ng
 test -e /usr/lib64/libespeak-ng.so.1
+# Kokoro runs on the Python stiloria-models names, which can trail the
+# system's when onnxruntime has no wheels for a new one yet.
+kokoro_python=$(sed -n 's/^kokoro_python=//p' /usr/bin/stiloria-models)
+rpm -qf "$kokoro_python" || dnf5 install -y "$(basename "$kokoro_python")"
 kokoro_check=$(mktemp -d)
 chown nobody: "$kokoro_check"
-as_user env HOME="$kokoro_check" python3 -m venv "$kokoro_check/venv"
+as_user env HOME="$kokoro_check" "$kokoro_python" -m venv "$kokoro_check/venv"
 if ! as_user env HOME="$kokoro_check" "$kokoro_check/venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
     --no-deps --only-binary=:all: --require-hashes -r /usr/lib/stiloria/kokoro/requirements.txt; then
-    echo "pip couldn't install Kokoro's requirements.txt (above). If it lacks wheels for this image's $(python3 --version), add them (see the file)." >&2
+    echo "pip couldn't install Kokoro's requirements.txt (above). If it lacks wheels for $("$kokoro_python" --version), add them (see the file)." >&2
     exit 1
 fi
 as_user env ORT_DISABLE_TELEMETRY=1 "$kokoro_check/venv/bin/python" -c 'import numpy, onnxruntime'
