@@ -1,0 +1,16 @@
+# The Python packages server.py needs, installed by `stiloria-models install
+# piper` into ~/.local/share/stiloria/piper-venv with pip --require-hashes
+# --no-deps, on the same Python as Kokoro's (runtime_python in
+# stiloria-models). build.sh installs them the same way, so the build fails
+# until every wheel is here for that Python. numpy and onnxruntime are pinned
+# as in ../kokoro/requirements.txt; see it for which Pythons they cover.
+# piper-tts's one wheel is abi3, for any Python from 3.9, and bundles its own
+# espeak-ng and its data. It also lists pathvalidate, which only its command
+# line uses, not PiperVoice.
+numpy==2.5.4 \
+    --hash=sha256:d549420b8858885cea8838a727842249218b9c1da24dd517e25c9c7a948310a3 \
+    --hash=sha256:56733449d2544178beaa4545cee357370440cf056c197f9c7bfb19dbfdd0e86d
+onnxruntime==1.31.0 \
+    --hash=sha256:e4efa4a1a0bb0b5173c6a3292c181d518b8323f9d56e978635d0c09d38c94d1a
+piper-tts==1.8.0 \
+    --hash=sha256:25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3

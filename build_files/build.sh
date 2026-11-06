@@ -220,29 +220,38 @@ for build in avx2:e7d5de68cc8fc610c3c961c47f879451db9bee4a2df152e9a66f1078072e7f
 done
 test "$(as_user voxtype --version)" = "voxtype $voxtype_version"
 
-# Text to speech: Kokoro on the CPU, so the GPU stays with games and the
-# language models. Its server (system_files/usr/lib/stiloria/kokoro) turns text
-# into phonemes with espeak-ng, and stiloria-models installs the onnxruntime
-# and numpy wheels pinned in requirements.txt. Each wheel is built for one
-# Python, so install them here the way stiloria-models does, and import them:
-# when Bazzite moves to a new Python, the build fails until requirements.txt
-# has its wheels, rather than shipping text to speech that can't install.
+# Text to speech, on the CPU, so the GPU stays with games and the language
+# models. Kokoro's server (system_files/usr/lib/stiloria/kokoro) turns text
+# into phonemes with espeak-ng; Piper's (system_files/usr/lib/stiloria/piper),
+# for a voice of the user's own, uses the espeak-ng bundled in its wheel.
+# stiloria-models installs the wheels pinned in each one's requirements.txt.
+# Each wheel is built for one Python, so install them here the way
+# stiloria-models does, and import them: when Bazzite moves to a new Python,
+# the build fails until requirements.txt has its wheels, rather than shipping
+# text to speech that can't install.
 rpm -q espeak-ng || dnf5 install -y espeak-ng
 test -e /usr/lib64/libespeak-ng.so.1
-# Kokoro runs on the Python stiloria-models names, which can trail the
-# system's when onnxruntime has no wheels for a new one yet.
-kokoro_python=$(sed -n 's/^kokoro_python=//p' /usr/bin/stiloria-models)
-rpm -qf "$kokoro_python" || dnf5 install -y "$(basename "$kokoro_python")"
-kokoro_check=$(mktemp -d)
-chown nobody: "$kokoro_check"
-as_user env HOME="$kokoro_check" "$kokoro_python" -m venv "$kokoro_check/venv"
-if ! as_user env HOME="$kokoro_check" "$kokoro_check/venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
-    --no-deps --only-binary=:all: --require-hashes -r /usr/lib/stiloria/kokoro/requirements.txt; then
-    echo "pip couldn't install Kokoro's requirements.txt (above). If it lacks wheels for $("$kokoro_python" --version), add them (see the file)." >&2
-    exit 1
-fi
-as_user env ORT_DISABLE_TELEMETRY=1 "$kokoro_check/venv/bin/python" -c 'import numpy, onnxruntime'
-rm -rf "$kokoro_check"
+# Both run on the Python stiloria-models names, which can trail the system's
+# when onnxruntime has no wheels for a new one yet.
+runtime_python=$(sed -n 's/^runtime_python=//p' /usr/bin/stiloria-models)
+rpm -qf "$runtime_python" || dnf5 install -y "$(basename "$runtime_python")"
+for tts in "kokoro:numpy, onnxruntime" "piper:piper"; do
+    name=${tts%%:*}
+    tts_check=$(mktemp -d)
+    chown nobody: "$tts_check"
+    as_user env HOME="$tts_check" "$runtime_python" -m venv "$tts_check/venv"
+    if ! as_user env HOME="$tts_check" "$tts_check/venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
+        --no-deps --only-binary=:all: --require-hashes -r "/usr/lib/stiloria/$name/requirements.txt"; then
+        echo "pip couldn't install $name's requirements.txt (above). If it lacks wheels for $("$runtime_python" --version), add them (see the file)." >&2
+        exit 1
+    fi
+    as_user env ORT_DISABLE_TELEMETRY=1 "$tts_check/venv/bin/python" -c "import ${tts#*:}"
+    # Piper's server imports more than piper itself; its --help stops after them.
+    if [[ $name == piper ]]; then
+        as_user env HOME="$tts_check" "$tts_check/venv/bin/python" /usr/lib/stiloria/piper/server.py --help > /dev/null
+    fi
+    rm -rf "$tts_check"
+done
 as_user stiloria-models --help > /dev/null
 
 ### Vivaldi, from Vivaldi's own RPM repository
