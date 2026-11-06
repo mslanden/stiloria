@@ -5,11 +5,20 @@ set -euo pipefail
 
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 models=$data/stiloria/models
-venv=$data/stiloria/kokoro-venv
-requirements=/usr/lib/stiloria/kokoro/requirements.txt
-# The Python Kokoro's environment is made with: the one onnxruntime has wheels
-# for, which can be older than the system's python3 (build.sh installs it).
-kokoro_python=/usr/bin/python3.14
+# The text-to-speech servers' Python environments: where each goes, its
+# hash-pinned requirements, what it installs, and what a working one imports.
+declare -A venv=([tts]=$data/stiloria/kokoro-venv [piper]=$data/stiloria/piper-venv)
+declare -A requirements=([tts]=/usr/lib/stiloria/kokoro/requirements.txt [piper]=/usr/lib/stiloria/piper/requirements.txt)
+declare -A runtime=([tts]="Kokoro's Python runtime" [piper]="Piper's Python runtime")
+declare -A packages=([tts]="onnxruntime and numpy" [piper]="piper-tts, onnxruntime and numpy")
+declare -A imports=([tts]="numpy, onnxruntime" [piper]=piper)
+# The Python they are made with: the one onnxruntime has wheels for, which can
+# be older than the system's python3 (build.sh installs it).
+runtime_python=/usr/bin/python3.14
+# Piper speaks with a voice of your own, which nothing downloads: its .onnx and
+# .onnx.json go in this folder by hand.
+piper_voices=$data/piper-voices
+piper_voice=$piper_voices/en_US-mira-medium.onnx
 
 # component|folder|file|bytes|sha256|url. Hugging Face files are pinned to a
 # commit of their repository; the checksums are the ones Hugging Face and
@@ -26,19 +35,20 @@ files=(
     "tts|$models|kokoro-v1.0.onnx|325505369|beb0d1848dee9a49da392cc3df26958d46cfa35d321edf434f52949153f0df3a|$kokoro"
     "tts|$models|voices-v1.0.bin|28214398|bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d|$kokoro"
 )
-components=(voice bonsai speech tts)
+components=(voice bonsai speech tts piper)
 declare -A describe=(
     [voice]="Voice commands: Ternary Bonsai 8B, for stiloria-voice-model.service"
     [bonsai]="Main model: Ternary Bonsai 2 27B and its image encoder, for stiloria-bonsai.service"
     [speech]="Speech to text: Whisper base.en, for voxtype"
     [tts]="Text to speech: Kokoro 82M and its Python runtime, for kokoro-tts.service"
+    [piper]="Text to speech: Piper's Python runtime, for piper-tts.service and your own voice"
 )
 
 usage() {
     cat <<EOF
 Usage: stiloria-models status
-       stiloria-models install voice|bonsai|speech|tts|all ...
-       stiloria-models check voice|bonsai|speech|tts
+       stiloria-models install voice|bonsai|speech|tts|piper|all ...
+       stiloria-models check voice|bonsai|speech|tts|piper
 
 Downloads the models Achilles' local AI services need into your home folder.
 No account or token is needed. Downloads show their progress, resume where
@@ -50,9 +60,14 @@ running install again only fetches what is missing.
   speech  $(human "$(component_bytes speech)")  ${describe[speech]}
   tts     $(human "$(component_bytes tts)")  ${describe[tts]}
           (onnxruntime and numpy, about 40 MiB more)
-  all     all four
+  piper   no models  ${describe[piper]}
+          (piper-tts, onnxruntime and numpy, about 75 MiB; the voice is yours)
+  all     all five
 
 Models go to ${models/#$HOME/\~}, Whisper's to ${data/#$HOME/\~}/voxtype/models.
+Piper's voice is one you made or chose yourself: nothing downloads it. Put
+${piper_voice##*/} and its .json in ${piper_voices/#$HOME/\~}; Achilles reads
+aloud with Kokoro until it is there.
 check exits with status 1 and says what to install if a component is missing;
 the services run it before they start.
 EOF
@@ -87,9 +102,14 @@ size_of() {
     stat -c %s "$1" 2>/dev/null || echo 0
 }
 
-# Kokoro's Python environment works with this system's Python.
+# A component's Python environment works with this system's Python.
 runtime_ready() {
-    [[ -x $venv/bin/python ]] && ORT_DISABLE_TELEMETRY=1 "$venv/bin/python" -c 'import numpy, onnxruntime' 2>/dev/null
+    local python=${venv[$1]}/bin/python
+    [[ -x $python ]] && ORT_DISABLE_TELEMETRY=1 "$python" -c "import ${imports[$1]}" 2>/dev/null
+}
+
+piper_voice_ready() {
+    [[ -f $piper_voice && -f $piper_voice.json ]]
 }
 
 # What is missing from a component, one item per line.
@@ -98,8 +118,11 @@ missing() {
     while IFS='|' read -r component folder name bytes sum url; do
         [[ $(size_of "$folder/$name") == "$bytes" ]] || echo "$name"
     done < <(entries "$1")
-    if [[ $1 == tts ]] && ! runtime_ready; then
-        echo "Kokoro's Python runtime"
+    if [[ -v venv[$1] ]] && ! runtime_ready "$1"; then
+        echo "${runtime[$1]}"
+    fi
+    if [[ $1 == piper ]] && ! piper_voice_ready; then
+        echo "your voice (${piper_voice/#$HOME/\~} and its .json)"
     fi
 }
 
@@ -118,7 +141,15 @@ status() {
         bytes=$(component_bytes "$component")
         absent=$(missing "$component")
         if [[ -z $absent ]]; then
-            state="installed, $(human "$bytes")"
+            state=installed
+            ((bytes == 0)) || state+=", $(human "$bytes")"
+        elif ((bytes == 0)); then
+            # piper: nothing to download, only its runtime and your voice.
+            if runtime_ready "$component"; then
+                state="needs your voice"
+            else
+                state="not installed"
+            fi
         else
             done_bytes=0
             while IFS='|' read -r _ folder name _; do
@@ -142,8 +173,13 @@ status() {
     if [[ -d $models ]]; then
         echo "Models: ${models/#$HOME/\~} ($(human "$(du -sb "$models" | cut -f1)") used)"
     fi
-    if [[ -d $venv ]]; then
-        echo "Kokoro's Python runtime: ${venv/#$HOME/\~} ($(human "$(du -sb "$venv" | cut -f1)") used)"
+    for component in tts piper; do
+        if [[ -d ${venv[$component]} ]]; then
+            echo "${runtime[$component]}: ${venv[$component]/#$HOME/\~} ($(human "$(du -sb "${venv[$component]}" | cut -f1)") used)"
+        fi
+    done
+    if piper_voice_ready; then
+        echo "Piper's voice: ${piper_voice/#$HOME/\~}"
     fi
 }
 
@@ -189,29 +225,30 @@ fetch() {
     mv -f "$part" "$target"
 }
 
-# What Kokoro's Python environment was made from: the requirements, and the
-# Python, since a venv only works with the Python that made it and the image
-# moves to a new one with each Fedora release.
+# What a component's Python environment was made from: the requirements, and
+# the Python, since a venv only works with the Python that made it and the
+# image moves to a new one with each Fedora release.
 runtime_stamp() {
-    "$kokoro_python" -c 'import sys; print("Python %d.%d" % sys.version_info[:2])'
-    cat "$requirements"
+    "$runtime_python" -c 'import sys; print("Python %d.%d" % sys.version_info[:2])'
+    cat "${requirements[$1]}"
 }
 
-# Kokoro's Python environment: onnxruntime and numpy wheels, hash-checked.
+# A component's Python environment: its pinned wheels, hash-checked.
 install_runtime() {
-    if runtime_ready && cmp -s <(runtime_stamp) "$venv/.stiloria-requirements"; then
-        echo "Kokoro's Python runtime: already installed"
+    local env=${venv[$1]}
+    if runtime_ready "$1" && cmp -s <(runtime_stamp "$1") "$env/.stiloria-requirements"; then
+        echo "${runtime[$1]}: already installed"
         return
     fi
-    echo "Kokoro's Python runtime: installing onnxruntime and numpy into ${venv/#$HOME/\~}"
-    rm -rf "$venv"
-    "$kokoro_python" -m venv "$venv"
-    if ! "$venv/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
-        --no-deps --only-binary=:all: --require-hashes -r "$requirements"; then
-        rm -rf "$venv"
-        die "installing Kokoro's Python runtime failed. Run the same command again to retry."
+    echo "${runtime[$1]}: installing ${packages[$1]} into ${env/#$HOME/\~}"
+    rm -rf "$env"
+    "$runtime_python" -m venv "$env"
+    if ! "$env/bin/pip" install --disable-pip-version-check --no-input --no-cache-dir \
+        --no-deps --only-binary=:all: --require-hashes -r "${requirements[$1]}"; then
+        rm -rf "$env"
+        die "installing ${runtime[$1]} failed. Run the same command again to retry."
     fi
-    runtime_stamp > "$venv/.stiloria-requirements"
+    runtime_stamp "$1" > "$env/.stiloria-requirements"
 }
 
 install() {
@@ -220,12 +257,20 @@ install() {
     while IFS='|' read -r _ folder name bytes sum url; do
         fetch "$folder" "$name" "$bytes" "$sum" "$url"
     done < <(entries "$component")
-    [[ $component == tts ]] && install_runtime
+    [[ -v venv[$component] ]] && install_runtime "$component"
     case $component in
         voice) echo "Ready: systemctl --user start stiloria-voice-model" ;;
         bonsai) echo "Ready: systemctl --user start stiloria-bonsai" ;;
         speech) echo "Ready: voxtype finds it in ${data/#$HOME/\~}/voxtype/models" ;;
         tts) echo "Ready: systemctl --user start kokoro-tts" ;;
+        piper)
+            if piper_voice_ready; then
+                echo "Ready: systemctl --user start piper-tts"
+            else
+                echo "Piper's runtime is ready. Its voice is your own: put ${piper_voice##*/} and"
+                echo "${piper_voice##*/}.json in ${piper_voices/#$HOME/\~}, then: systemctl --user start piper-tts"
+            fi
+            ;;
     esac
 }
 

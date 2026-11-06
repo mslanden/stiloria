@@ -1,7 +1,7 @@
 # The Python packages server.py needs, installed by `stiloria-models install tts`
 # into ~/.local/share/stiloria/kokoro-venv with pip --require-hashes --no-deps.
 # Each hash is one wheel, built for one Python, and pip takes the one for the
-# Python that stiloria-models names (kokoro_python, Python 3.14 for now, since
+# Python that stiloria-models names (runtime_python, Python 3.14 for now, since
 # onnxruntime 1.31 has no wheels for Fedora 45's Python 3.15 yet). build.sh
 # installs them the same way, so the build fails until its wheels are here.
 # numpy's are for Python 3.14 and 3.15.
