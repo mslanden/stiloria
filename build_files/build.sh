@@ -445,4 +445,21 @@ EOF
     # rather than linking it, so the ldd check above can't see it.
     dnf5 install -y gtk-layer-shell
     test -f /usr/lib64/libgtk-layer-shell.so.0
+
+    # app_preview (Achilles opening and testing the web apps it builds) and
+    # pdf_render drive Chromium through chromedriver inside Achilles' sandbox,
+    # which sees only /usr, so Flatpak browsers can't stand in. The headless
+    # build is enough, and smaller than the full browser: about 270 MB with
+    # chromium-common. Achilles finds headless_shell itself. pdf_render also
+    # makes page previews with Pillow and poppler's pdfinfo and pdftoppm,
+    # which Bazzite has today; named here so they stay.
+    dnf5 install -y --setopt=install_weak_deps=False chromium-headless chromedriver python3-pillow poppler-utils
+    test -x /usr/lib64/chromium-browser/headless_shell
+    chromedriver --version
+    python3 -c 'import PIL'
+    test -x /usr/bin/pdfinfo && test -x /usr/bin/pdftoppm
+    if ldd /usr/lib64/chromium-browser/headless_shell /usr/bin/chromedriver | grep 'not found'; then
+        echo "Chromium for Achilles needs libraries this image lacks (above)" >&2
+        exit 1
+    fi
 fi
