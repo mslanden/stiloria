@@ -1,0 +1,17 @@
+# Achilles starts this on demand (systemctl --user start) when your Piper
+# voice is in ~/.local/share/piper-voices; it has no [Install] section, so it
+# never starts at login on its own.
+[Unit]
+Description=Piper text-to-speech for Achilles (CPU only, 127.0.0.1:17835)
+
+[Service]
+Type=exec
+# Fails the start, telling the user what to install, if the voice or its
+# Python runtime is missing.
+ExecStartPre=/usr/bin/stiloria-models check piper
+ExecStart=%D/stiloria/piper-venv/bin/python /usr/lib/stiloria/piper/server.py
+# Also set in server.py: onnxruntime from PyPI otherwise reports usage to Microsoft.
+Environment=ORT_DISABLE_TELEMETRY=1
+# Restart after a crash; an error exit stays failed.
+Restart=on-abnormal
+RestartSec=3
