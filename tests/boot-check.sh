@@ -42,9 +42,10 @@ check() {
 # Whatever happens, boot-test.sh gets a result line and the VM stops.
 finish() {
     # A first boot may restart itself: Bazzite's hardware setup does, to apply
-    # its kernel arguments. This unit is stopped with everything else, and the
-    # checks are for the boot that follows.
-    if [[ -n $vm && -z $finished && $(systemctl is-system-running) == stopping ]]; then
+    # its kernel arguments. systemd then stops this unit with everything else,
+    # and the checks are for the boot that follows. Nothing is run to find
+    # that out: systemd is ending every process of the unit just then.
+    if [[ -n $vm && -z $finished && -n $stopped ]]; then
         say "note: the system is restarting itself; the checks run on the next boot"
         return
     fi
@@ -67,6 +68,9 @@ finish() {
     [[ -z $vm ]] || systemctl poweroff
 }
 trap finish EXIT
+# In the VM only systemd stops this script, and only when the system goes down.
+stopped=
+trap 'stopped=1; exit 143' TERM
 
 ### It boots, all the way to the login screen
 # The unit that runs this in the VM starts with multi-user.target, before the
