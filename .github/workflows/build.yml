@@ -27,9 +27,8 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
 # A newer push to a pull request replaces the build in progress. On main a
-# build runs to the end, since one cancelled between pushing and signing would
-# leave `testing` unsigned, which a machine following it refuses to update to;
-# a newer one waits its turn instead. `latest` only ever moves to an image
+# build runs to the end and a newer one waits its turn, so `testing` and
+# `latest` move in the order of the commits. Both only ever move to an image
 # that is already signed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -483,16 +482,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Published first as `testing`, and under this commit's own testing tag,
-      # so a build that fails the boot test below can still be pulled and
-      # looked at, and a machine can follow `testing` to get every build.
+      # Published first under this commit's own testing tag, so a build that
+      # fails the boot test below can still be pulled and looked at. `testing`
+      # itself moves once the image is signed, further down.
+      #
+      # Pushed twice on purpose. podman's first push of an image, the one that
+      # compresses and uploads its layers, writes a manifest without the
+      # layers' annotations (rpm-ostree's ostree.components, which say what
+      # each layer holds); a push that finds the layers already in the
+      # registry keeps them. That makes two manifests with two digests: the
+      # second is the one that is signed, tested and published, as it was when
+      # this step pushed every tag itself.
       - name: Push To GHCR as testing
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         id: push-image
         run: |
           set -euox pipefail
-          for tag in testing "testing-$(git rev-parse --short HEAD)"; do
-            podman push --digestfile=/tmp/digestfile ${IMAGE_NAME}:${DEFAULT_TAG} ${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}
+          for _ in first second; do
+            podman push --digestfile=/tmp/digestfile ${IMAGE_NAME}:${DEFAULT_TAG} "${IMAGE_REGISTRY}/${IMAGE_NAME}:testing-$(git rev-parse --short HEAD)"
           done
 
           digest=$(< /tmp/digestfile)
@@ -522,6 +529,28 @@ jobs:
           # https://github.com/coreos/rpm-ostree/issues/5509
           # use old bundle format, so we can use newer cosign 3.X.X instead of 2.X.X
           cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY ${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}
+
+      # `testing` gets every build, whether or not it boots: it moves here, to
+      # the digest just signed, copied within the registry. Every tag is then
+      # that one signed image, whatever a push would have made of it.
+      - name: Move testing to the signed image
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          DIGEST: ${{ steps.push-image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          command -v skopeo > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq skopeo; }
+          [[ "${DIGEST}" == sha256:* ]]
+          skopeo copy --retry-times 3 --preserve-digests \
+            "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}" \
+            "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}:testing"
+          for tag in testing "testing-$(git rev-parse --short HEAD)"; do
+            tagged=$(skopeo inspect --retry-times 3 --no-tags --format '{{ .Digest }}' "docker://${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}")
+            if [[ "${tagged}" != "${DIGEST}" ]]; then
+              echo "::error title=Unsigned tag::${IMAGE_NAME}:${tag} is ${tagged}, not the signed ${DIGEST}."
+              exit 1
+            fi
+          done
 
       # The boot test's VM: GitHub's runners have KVM, for root until this
       # rule opens it, and no QEMU or UEFI firmware.
