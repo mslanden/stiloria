@@ -450,6 +450,12 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
+# Install the image to a disk and boot it in a VM, where it checks itself
+# (tests/boot-test.sh). Asks for sudo, to install; the VM runs as you.
+[group('Run Virtal Machine')]
+boot-test $target_image=("localhost/" + image_name) $tag=default_tag:
+    tests/boot-test.sh "${target_image}:${tag}"
+
 # Runs shell check on all Bash scripts
 lint:
     #!/usr/bin/env bash
