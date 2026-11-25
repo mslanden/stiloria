@@ -109,10 +109,15 @@ runtime_ready() {
 }
 
 # The Piper voices: each NAME.onnx in piper-voices that has its NAME.onnx.json.
+# NAME keeps to letters, digits, "_", "." and "-" and doesn't start with a dot,
+# as piper-tts and Achilles require: they don't see a voice named otherwise.
 piper_voice_names() {
-    local model
+    local model name
     for model in "$piper_voices"/*.onnx; do
-        [[ -f $model && -f $model.json ]] && basename "$model" .onnx
+        name=$(basename "$model" .onnx)
+        if [[ -f $model && -f $model.json && $name =~ ^[A-Za-z0-9_-][A-Za-z0-9_.-]*$ ]]; then
+            echo "$name"
+        fi
     done
 }
 
