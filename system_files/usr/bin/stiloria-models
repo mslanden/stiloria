@@ -15,10 +15,9 @@ declare -A imports=([tts]="numpy, onnxruntime" [piper]=piper)
 # The Python they are made with: the one onnxruntime has wheels for, which can
 # be older than the system's python3 (build.sh installs it).
 runtime_python=/usr/bin/python3.14
-# Piper speaks with a voice of your own, which nothing downloads: its .onnx and
-# .onnx.json go in this folder by hand.
+# Piper speaks with voices of your own, which nothing downloads: each one's
+# NAME.onnx and NAME.onnx.json go in this folder by hand.
 piper_voices=$data/piper-voices
-piper_voice=$piper_voices/en_US-mira-medium.onnx
 
 # component|folder|file|bytes|sha256|url. Hugging Face files are pinned to a
 # commit of their repository; the checksums are the ones Hugging Face and
@@ -41,7 +40,7 @@ declare -A describe=(
     [bonsai]="Main model: Ternary Bonsai 2 27B and its image encoder, for stiloria-bonsai.service"
     [speech]="Speech to text: Whisper base.en, for voxtype"
     [tts]="Text to speech: Kokoro 82M and its Python runtime, for kokoro-tts.service"
-    [piper]="Text to speech: Piper's Python runtime, for piper-tts.service and your own voice"
+    [piper]="Text to speech: Piper's Python runtime, for piper-tts.service and your own voices"
 )
 
 usage() {
@@ -65,9 +64,10 @@ running install again only fetches what is missing.
   all     all five
 
 Models go to ${models/#$HOME/\~}, Whisper's to ${data/#$HOME/\~}/voxtype/models.
-Piper's voice is one you made or chose yourself: nothing downloads it. Put
-${piper_voice##*/} and its .json in ${piper_voices/#$HOME/\~}; Achilles reads
-aloud with Kokoro until it is there.
+Piper's voices are ones you trained or downloaded yourself: nothing installs
+them. Put each one's NAME.onnx and NAME.onnx.json in ${piper_voices/#$HOME/\~};
+Achilles lists them in Settings → Voice, and reads aloud with Kokoro until
+there is one.
 check exits with status 1 and says what to install if a component is missing;
 the services run it before they start.
 EOF
@@ -108,8 +108,12 @@ runtime_ready() {
     [[ -x $python ]] && ORT_DISABLE_TELEMETRY=1 "$python" -c "import ${imports[$1]}" 2>/dev/null
 }
 
-piper_voice_ready() {
-    [[ -f $piper_voice && -f $piper_voice.json ]]
+# The Piper voices: each NAME.onnx in piper-voices that has its NAME.onnx.json.
+piper_voice_names() {
+    local model
+    for model in "$piper_voices"/*.onnx; do
+        [[ -f $model && -f $model.json ]] && basename "$model" .onnx
+    done
 }
 
 # What is missing from a component, one item per line.
@@ -121,8 +125,8 @@ missing() {
     if [[ -v venv[$1] ]] && ! runtime_ready "$1"; then
         echo "${runtime[$1]}"
     fi
-    if [[ $1 == piper ]] && ! piper_voice_ready; then
-        echo "your voice (${piper_voice/#$HOME/\~} and its .json)"
+    if [[ $1 == piper && -z $(piper_voice_names) ]]; then
+        echo "a voice (NAME.onnx and NAME.onnx.json in ${piper_voices/#$HOME/\~})"
     fi
 }
 
@@ -135,7 +139,7 @@ check() {
 }
 
 status() {
-    local component bytes state done_bytes folder name absent
+    local component bytes state done_bytes folder name absent voices
     printf '%-8s %-30s %s\n' Component State Contents
     for component in "${components[@]}"; do
         bytes=$(component_bytes "$component")
@@ -144,9 +148,9 @@ status() {
             state=installed
             ((bytes == 0)) || state+=", $(human "$bytes")"
         elif ((bytes == 0)); then
-            # piper: nothing to download, only its runtime and your voice.
+            # piper: nothing to download, only its runtime and your voices.
             if runtime_ready "$component"; then
-                state="needs your voice"
+                state="needs a voice"
             else
                 state="not installed"
             fi
@@ -178,8 +182,9 @@ status() {
             echo "${runtime[$component]}: ${venv[$component]/#$HOME/\~} ($(human "$(du -sb "${venv[$component]}" | cut -f1)") used)"
         fi
     done
-    if piper_voice_ready; then
-        echo "Piper's voice: ${piper_voice/#$HOME/\~}"
+    voices=$(piper_voice_names | paste -sd, - | sed 's/,/, /g')
+    if [[ -n $voices ]]; then
+        echo "Piper's voices: ${piper_voices/#$HOME/\~} ($voices)"
     fi
 }
 
@@ -264,11 +269,11 @@ install() {
         speech) echo "Ready: voxtype finds it in ${data/#$HOME/\~}/voxtype/models" ;;
         tts) echo "Ready: systemctl --user start kokoro-tts" ;;
         piper)
-            if piper_voice_ready; then
+            if [[ -n $(piper_voice_names) ]]; then
                 echo "Ready: systemctl --user start piper-tts"
             else
-                echo "Piper's runtime is ready. Its voice is your own: put ${piper_voice##*/} and"
-                echo "${piper_voice##*/}.json in ${piper_voices/#$HOME/\~}, then: systemctl --user start piper-tts"
+                echo "Piper's runtime is ready. Its voices are your own: put a voice's NAME.onnx"
+                echo "and NAME.onnx.json in ${piper_voices/#$HOME/\~}, then: systemctl --user start piper-tts"
             fi
             ;;
     esac
