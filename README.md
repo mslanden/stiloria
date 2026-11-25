@@ -4,7 +4,7 @@
 
 A Linux for gaming and AI, built on [Bazzite](https://bazzite.gg) with the KDE Plasma desktop. Stiloria is the home of **Achilles**, a local voice assistant for controlling the PC.
 
-Stiloria is an image-based (bootc) system: this repo is the recipe, and GitHub Actions builds it on top of the latest Bazzite stable whenever the image's files here change, and whenever Bazzite does (checked daily). Installed machines update to new builds automatically, and the previous version can be picked from the boot menu if an update misbehaves.
+Stiloria is an image-based (bootc) system: this repo is the recipe, and GitHub Actions builds it on top of the latest Bazzite stable whenever the image's files here change, and whenever Bazzite does (checked daily). Each build is started in a VM first, and installed machines update automatically to the ones that boot (see [Tested builds](#tested-builds-and-the-testing-channel)); the previous version can be picked from the boot menu if an update misbehaves.
 
 ## Install
 
@@ -37,6 +37,25 @@ Older NVIDIA cards (GTX 10-series and earlier) aren't supported yet. Switching a
 ## Signed updates
 
 Every build is signed with this repo's key (`cosign.pub` is its public half). Stiloria carries a container policy that accepts a `stiloria` or `stiloria-nvidia` image only with that signature, so once a machine runs Stiloria, every update it downloads is verified and anything else is rejected. The installer ISOs are built only from images with a valid signature, and a machine installed from one tracks the signed image (`ostree-image-signed:docker://ghcr.io/mslanden/stiloria:latest`, or `stiloria-nvidia`) from its first boot. The first switch from Bazzite can't check this, because Bazzite doesn't know the key. On its first boot Stiloria therefore switches itself to signed tracking of the same image (`stiloria-signed-tracking.service`), which applies at the next reboot; from then on every update is verified, and `fastfetch` shows a closed lock. It waits if an update is already staged, and leaves images other than Stiloria's alone. Builds start only from a Bazzite image signed by Universal Blue (`.github/ublue-os.pub`, the key Bazzite itself checks), by the exact digest that was checked.
+
+## Tested builds, and the testing channel
+
+Before installed machines get a build, CI installs it to a disk the way `bootc install` does on a real PC and starts it in a VM (`tests/boot-test.sh`). The image has to boot to its login screen and pass the checks in `tests/boot-check.sh`: SELinux enforcing, Vivaldi linked into `/opt`, libvirt answering, Stiloria's services in place. Only then does `latest`, the tag machines update from, move to that build: the same image, by digest, so its signature still holds. A build that fails stays off `latest`, which keeps the last build that passed. Pull requests are built and booted the same way, and publish nothing; each run's summary lists the checks, and the VM's console is in its `boot-log` artifact.
+
+Every build from `main` is published as `testing` as soon as it is built and signed, before the boot test. To get builds first on a machine of your own, follow it (NVIDIA: `stiloria-nvidia`), and switch back the same way with `:latest`:
+
+```bash
+sudo bootc switch --enforce-container-sigpolicy ghcr.io/mslanden/stiloria:testing
+```
+
+The VM has no network, no user account and no real graphics card, so the test stops at the login screen: it doesn't cover logging in (the desktop's look, the greeting, Achilles), Game Mode, app installs, or the installer ISOs.
+
+To run it on an image built here (it asks for `sudo`, to install to the disk), or to run just the checks on an installed machine:
+
+```bash
+just build && just boot-test
+tests/boot-check.sh
+```
 
 ## What Stiloria adds to Bazzite
 
@@ -87,7 +106,8 @@ or build without it: `mkdir -p achilles && echo "local build" > achilles/skipped
 | `system_files/` | Copied as-is into the OS (configs, services) |
 | `image-template.env` | Image name and metadata |
 | `achilles.ref` | The Achilles commit built into the image |
-| `.github/workflows/build.yml` | Daily build, publish, and signing of both editions |
+| `.github/workflows/build.yml` | Daily build, signing, boot test and publishing of both editions |
+| `tests/` | The boot test: `boot-test.sh` installs an image to a disk and starts it in a VM, where `boot-check.sh` checks it |
 | `installer/` | The live system on the installer ISO: Stiloria plus Anaconda and the edition it installs |
 | `.github/workflows/build-disk.yml` | Builds both installer ISOs with [Titanoboa](https://github.com/ublue-os/titanoboa), on demand and for releases |
 
