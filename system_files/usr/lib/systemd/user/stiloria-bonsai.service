@@ -1,7 +1,7 @@
 # Achilles starts this on demand (systemctl --user start); it has no [Install]
 # section, so it never starts at login on its own.
 [Unit]
-Description=Main model for Achilles (Ternary Bonsai 2 27B, 127.0.0.1:8085)
+Description=Main model for Achilles (Ternary Bonsai 2.5 27B, 127.0.0.1:8085)
 
 [Service]
 Type=exec
@@ -9,6 +9,7 @@ Type=exec
 ExecStartPre=/usr/bin/stiloria-models check bonsai
 # The key it requires, made the first time for each user.
 ExecStartPre=/usr/libexec/stiloria-llama-api-key %S/stiloria/llama-api-key
+# The image encoder is Bonsai 2's, which Bonsai 2.5 shares (see stiloria-models).
 # "-c auto": 65536 tokens on GPUs with 16 GB or more, else 32768; see
 # /usr/libexec/stiloria-llama-server.
 # Achilles is its only client, and calls it from its own process, not from a
@@ -18,9 +19,9 @@ ExecStartPre=/usr/libexec/stiloria-llama-api-key %S/stiloria/llama-api-key
 # /health needs the key Achilles sends, so a website can't have it run a
 # request at all, even one whose answer it can't read.
 ExecStart=/usr/libexec/stiloria-llama-server \
-    -m %D/stiloria/models/Ternary-Bonsai-2-27B-PQ2_0.gguf \
+    -m %D/stiloria/models/Ternary-Bonsai-2.5-27B-PQ2_0.gguf \
     --mmproj %D/stiloria/models/Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf \
-    --host 127.0.0.1 --port 8085 --alias bonsai-2-27b \
+    --host 127.0.0.1 --port 8085 --alias bonsai-2.5-27b \
     --no-webui --no-slots --cors-origins http://127.0.0.1:8085 \
     --api-key-file %S/stiloria/llama-api-key \
     -ngl 999 -fa on -c auto -np 1 -ctk q8_0 -ctv q8_0 \

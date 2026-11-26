@@ -85,7 +85,7 @@ PlasmoidItem {
     }
 
     // The hint, split around its two keys: "Hold ", key, " + ", key, " to talk to Achilles."
-    readonly property var keys: [i18nc("@info keyboard key", "Super"), "`"]
+    readonly property var keys: [i18nc("@info keyboard key", "Super"), i18nc("@info keyboard key", "Space")]
     readonly property var hintParts: i18nc("@info %1 and %2 are keys, drawn as keycaps", "Hold %1 + %2 to talk to Achilles.", "\u0001", "\u0002")
         .split(/([\u0001\u0002])/).filter(part => part !== "")
 
