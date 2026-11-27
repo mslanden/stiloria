@@ -23,5 +23,5 @@ LayoutName=org.kde.breeze.desktop
 library=org.kde.breeze
 theme=Breeze
 
-[KSplash]
-Theme=com.valve.vapor
+[ksplashrc][KSplash]
+Theme=com.stiloria.day.desktop

@@ -1,0 +1,16 @@
+# Stiloria's window manager defaults, in Porcelain's quiet (see "Motion and
+# windows" in build_files/build.sh). Settings an account changes in System
+# Settings go to its own ~/.config/kwinrc and win over these.
+
+# Windows open and close from 92% of their size, not Breeze's 80%.
+[Effect-scale]
+InScale=0.92
+OutScale=0.92
+
+# Title bars keep minimize, maximize and close. Gone: the window menu (still on
+# Alt+F3 and a right click on the title), the on-all-desktops pin and the help
+# button. The capture indicator, shown only for a window kept out of
+# screenshots, stays.
+[org.kde.kdecoration2]
+ButtonsOnLeft=E
+ButtonsOnRight=IAX

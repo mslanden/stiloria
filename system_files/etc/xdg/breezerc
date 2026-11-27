@@ -1,0 +1,9 @@
+# Breeze's window decoration and widget style both read this. Porcelain's
+# shadows are warm ink and light, not black: about half of Breeze's strength,
+# in Porcelain's ink (29,27,24), at Breeze's large size. One strength serves
+# day and night, so it sits between Porcelain's light day shadows and its
+# heavier night ones.
+[Common]
+ShadowColor=29,27,24
+ShadowSize=ShadowLarge
+ShadowStrength=140
