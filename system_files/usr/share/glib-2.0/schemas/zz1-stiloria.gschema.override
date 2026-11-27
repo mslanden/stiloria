@@ -1,0 +1,6 @@
+# GTK apps draw with Breeze GTK, which takes Stiloria's colors from the
+# colors.css Plasma writes for each scheme, by day and night. Left at Adwaita,
+# they kept GTK's own gray and blue. Flatpak apps get the same name through the
+# settings portal (and use it once the Breeze GTK theme is installed for them).
+[org.gnome.desktop.interface]
+gtk-theme='Breeze'

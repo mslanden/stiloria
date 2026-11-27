@@ -1,0 +1,12 @@
+# The kernel prints only critical messages to the screen (loglevel=3), so an
+# error line no longer flashes over the boot splash or the moment between it
+# and the login screen; everything still goes to the journal. The text console
+# uses Porcelain Night's colors: color 0, the background, is its warm black
+# and 7, the text, its ivory, as in kmscon.conf; the others are Konsole's
+# Stiloria scheme. bootc applies these at install and with the next update.
+kargs = [
+    "loglevel=3",
+    "vt.default_red=19,224,127,224,159,198,143,242,113,240,165,240,195,220,180,242",
+    "vt.default_grn=18,128,196,177,180,174,196,238,106,160,220,203,211,201,220,238",
+    "vt.default_blu=16,107,155,94,194,211,192,232,95,142,185,136,221,230,216,232",
+]

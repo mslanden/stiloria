@@ -145,6 +145,19 @@ for theme in Stiloria Stiloria-Dark; do
 done
 grep -qx Theme=Stiloria /usr/share/plasma/look-and-feel/com.stiloria.day.desktop/contents/defaults
 grep -qx Theme=Stiloria-Dark /usr/share/plasma/look-and-feel/com.stiloria.night.desktop/contents/defaults
+# The loading screen after login, the helmet and wordmark on warm black, for
+# day and night alike (Splash.qml says why); without one Plasma showed its
+# own. The packages name themselves as the splash, so accounts already on
+# Stiloria Day or Night get it at their next login.
+install -Dm644 /usr/share/plasma/look-and-feel/com.stiloria.night.desktop/contents/splash/Splash.qml \
+    /usr/share/plasma/look-and-feel/com.stiloria.day.desktop/contents/splash/Splash.qml
+for look in day night; do
+    splash=/usr/share/plasma/look-and-feel/com.stiloria.$look.desktop/contents/splash
+    test -f "$splash/Splash.qml"
+    install -d "$splash/images"
+    gzip -9 -n -c /usr/share/stiloria/stiloria-logo-light.svg > "$splash/images/stiloria.svgz"
+    grep -qx "Theme=com.stiloria.$look.desktop" "$splash/../defaults"
+done
 # Porcelain's typefaces, Instrument Sans for the interface and Instrument Serif
 # for display text (the greeting, the boot wordmark). Fedora doesn't package
 # them, so they ship in system_files/usr/share/fonts (from github.com/google/fonts,
@@ -155,6 +168,68 @@ test "$(fc-match -f '%{family}' 'Instrument Sans')" = "Instrument Sans"
 test "$(fc-match -f '%{family}' 'Instrument Serif')" = "Instrument Serif"
 sed -i 's/^\(font\|menuFont\|smallestReadableFont\|toolBarFont\)=Noto Sans,/\1=Instrument Sans,/' /etc/xdg/kdeglobals
 test "$(grep -c '^\(font\|menuFont\|smallestReadableFont\|toolBarFont\)=Instrument Sans,' /etc/xdg/kdeglobals)" = 4
+# At Porcelain's sizes, a point larger than Bazzite's: 11pt is 14.7px at 96 dpi,
+# near Porcelain's 15px body text; toolbars 10pt (its 14px labels) and the
+# smallest text 9pt (its 12px captions). They stay out of the global themes'
+# defaults, which Plasma applies at every sunrise and sunset and would reset a
+# font someone picked. An account that set its own fonts keeps them.
+sed -i -e 's/^\(font\|menuFont\)=Instrument Sans,10,/\1=Instrument Sans,11,/' \
+    -e 's/^toolBarFont=Instrument Sans,9,/toolBarFont=Instrument Sans,10,/' \
+    -e 's/^smallestReadableFont=Instrument Sans,8,/smallestReadableFont=Instrument Sans,9,/' /etc/xdg/kdeglobals
+for line in 'font=Instrument Sans,11,' 'menuFont=Instrument Sans,11,' 'toolBarFont=Instrument Sans,10,' \
+    'smallestReadableFont=Instrument Sans,9,'; do
+    test "$(grep -c "^$line" /etc/xdg/kdeglobals)" = 1
+done
+# Window titles are headings: the sans at semibold (Qt's legacy weight 63),
+# kept at 10pt so title bars don't grow. Without this KWin draws them in Noto
+# Sans, the one piece of interface text left in Bazzite's font. Bazzite's file
+# has no [WM] group of its own.
+test -z "$(grep -x '\[WM\]' /etc/xdg/kdeglobals)"
+printf '\n[WM]\nactiveFont=Instrument Sans,10,-1,5,63,0,0,0,0,0\n' >> /etc/xdg/kdeglobals
+test "$(grep -cx 'activeFont=Instrument Sans,10,-1,5,63,0,0,0,0,0' /etc/xdg/kdeglobals)" = 1
+# The generic families are Porcelain's too: sans-serif is Instrument Sans and
+# monospace Fira Code (55-stiloria-generics.conf, which has to come before
+# Noto's 56 and 57: the first preference wins, and theirs would beat Fira
+# Code's own 60). This reaches host apps and the boot screen's text, which
+# dracut takes from fc-match below; Flatpaks read their runtime's fonts.conf.
+# Emoji come in color: fontconfig picked the black-and-white Symbola and Noto
+# Emoji for them first, so they go (rpm -e fails if anything needs them).
+ln -s /usr/share/fontconfig/conf.avail/55-stiloria-generics.conf /etc/fonts/conf.d/55-stiloria-generics.conf
+rpm -e gdouros-symbola-fonts google-noto-emoji-fonts
+fc-cache -f
+test "$(fc-match -f '%{family[0]}' sans-serif)" = "Instrument Sans"
+test "$(fc-match -f '%{family[0]}' monospace)" = "Fira Code"
+test "$(fc-match -f '%{family[0]}' 'Instrument Sans:charset=1f600')" = "Noto Color Emoji"
+
+### Motion and windows: Porcelain's pace and quiet
+# Porcelain moves in 150-180ms; Plasma's effects take 200-300ms. One factor
+# scales them all (KWin's, Plasma's and the Breeze style's): maximize goes from
+# 250 to 180ms, the overview from 300 to 216. The Animation speed slider in
+# System Settings still overrides it per account. kwinrc makes windows open
+# from 92% rather than 80% and drops the window menu, the on-all-desktops pin
+# and the help button from title bars (the capture indicator stays); klaunchrc
+# stops the icon beside the pointer bouncing while an app starts; breezerc
+# softens window and menu shadows from Breeze's solid black to about half, in
+# warm ink. None of these files is in Bazzite's image, so Stiloria's stand
+# alone; an account's own settings still win over them.
+sed -i '/^DefaultDarkLookAndFeel=com.stiloria.night.desktop$/a AnimationDurationFactor=0.72' /etc/xdg/kdeglobals
+test "$(grep -cx AnimationDurationFactor=0.72 /etc/xdg/kdeglobals)" = 1
+for file in kwinrc klaunchrc breezerc; do
+    test -f "/etc/xdg/$file"
+    if rpm -qf --quiet "/etc/xdg/$file"; then exit 1; fi
+done
+
+### GTK apps in Stiloria's colors
+# Plasma writes each color scheme for GTK as colors.css, which only the Breeze
+# GTK theme reads; GTK was left on Adwaita, so GTK apps kept its gray and blue.
+# The schema override names Breeze for every account that hasn't picked a
+# theme (and, through the settings portal, for Flatpaks); Bazzite's GTK 3
+# settings.ini named Vapor. libadwaita apps keep their own look.
+test -f /usr/share/themes/Breeze/gtk-3.0/gtk.css
+test -f /usr/share/themes/Breeze/gtk-4.0/gtk.css
+glib-compile-schemas --strict /usr/share/glib-2.0/schemas
+sed -i 's/^gtk-theme-name=Vapor$/gtk-theme-name=Breeze/' /etc/xdg/gtk-3.0/settings.ini
+grep -qx gtk-theme-name=Breeze /etc/xdg/gtk-3.0/settings.ini
 
 ### Boot screen: Stiloria's watermark under the firmware logo (Plymouth's bgrt
 # theme draws spinner/watermark.png). Plymouth runs from the initramfs, so
@@ -175,6 +250,22 @@ rmdir /var/roothome
 chmod 0600 "$initramfs"
 modules "$initramfs" | diff /tmp/initramfs-modules.before -
 lsinitrd -f usr/share/plymouth/themes/spinner/watermark.png "$initramfs" | cmp - /usr/share/stiloria/plymouth-watermark.png
+# The text Plymouth draws (the disk password prompt) is in whatever font plain
+# fc-match names, Instrument Sans since the fonts above, and the monospace in
+# Fira Code: make sure both made it in.
+lsinitrd "$initramfs" > /tmp/initramfs-files
+grep -qF 'usr/share/fonts/Plymouth.ttf -> /usr/share/fonts/instrument-sans/InstrumentSans[wdth,wght].ttf' /tmp/initramfs-files
+grep -qE ' usr/share/fonts/instrument-sans/InstrumentSans\[wdth,wght\]\.ttf$' /tmp/initramfs-files
+grep -qF 'usr/share/fonts/Plymouth-monospace.ttf -> /usr/share/fonts/fira-code/FiraCode-Regular.ttf' /tmp/initramfs-files
+
+# The splash stays up until the login screen is about to start
+# (systemd/system/plasmalogin.service.d), and no kernel message is printed over
+# it (bootc/kargs.d/20-stiloria-console.toml, which also gives the text
+# console Porcelain Night's colors, as etc/kmscon/kmscon.conf does for the
+# consoles on Ctrl+Alt+F2 to F6).
+test -f /usr/lib/systemd/system/plasmalogin.service
+grep -q '^kargs = \[' /usr/lib/bootc/kargs.d/20-stiloria-console.toml
+rpm -q kmscon
 
 ### Local AI services
 # Achilles, the voice assistant, talks to these over HTTP on 127.0.0.1 and

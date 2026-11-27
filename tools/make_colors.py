@@ -7,7 +7,8 @@ with ivory text at night. It has one accent, Slate, a cool stone blue: it
 fills selections (and with them the checked boxes, progress bars and sliders
 that Qt draws in the selection color) and colors links. Keyboard focus is ink,
 never the accent. Every text color is checked against the backgrounds it is
-drawn on (WCAG AA, 4.5:1); the script fails otherwise. Groups and keys follow
+drawn on (WCAG AA, 4.5:1), and every focus ring against its background
+(3:1, the minimum for a non-text indicator); the script fails otherwise. Groups and keys follow
 Plasma 6's Breeze schemes (LGPL-2.0-or-later).
 """
 import pathlib, sys
@@ -46,7 +47,12 @@ DAY = {
         "Header][Inactive": ("#f4f1ec", "#ebe7e0"),
         "Tooltip": ("#fbfaf7", "#f4f1ec"),
     },
-    "complementary": {"bg": ("#131210", "#1c1a17"), "fg": "#f2eee8", "inactive": "#a39c91", "link": "#9fb4c2"},
+    # The dark set the lock, login and logout screens draw on. Its focus ring
+    # and status colors are the night ones, made for warm black, not the
+    # day's, which are made for ivory and vanish here.
+    "complementary": {"bg": ("#131210", "#1c1a17"), "fg": "#f2eee8", "inactive": "#a39c91", "link": "#9fb4c2",
+                      "visited": "#c6aed3", "negative": "#f08a75", "neutral": "#e0b15e", "positive": "#7fc49b",
+                      "deco": {"DecorationFocus": "#f2eee8", "DecorationHover": "#8f877b"}},
     "selection": {"bg": ("#3e5869", "#4a6577"), "fg": "#fffaf5", "inactive": "#e2e8ec"},
     "wm": {"activeBackground": "#f4f1ec", "activeForeground": "#1d1b18", "inactiveBackground": "#f4f1ec", "inactiveForeground": "#6a645b"},
 }
@@ -66,7 +72,9 @@ NIGHT = {
         "Header][Inactive": ("#131210", "#0d0c0b"),
         "Tooltip": ("#1c1a17", "#131210"),
     },
-    "complementary": {"bg": ("#131210", "#1c1a17"), "fg": "#f2eee8", "inactive": "#a39c91", "link": "#9fb4c2"},
+    "complementary": {"bg": ("#131210", "#1c1a17"), "fg": "#f2eee8", "inactive": "#a39c91", "link": "#9fb4c2",
+                      "visited": "#c6aed3", "negative": "#f08a75", "neutral": "#e0b15e", "positive": "#7fc49b",
+                      "deco": {"DecorationFocus": "#f2eee8", "DecorationHover": "#8f877b"}},
     "selection": {"bg": ("#9fb4c2", "#b0c2ce"), "fg": "#1d1b18", "inactive": "#333d44"},
     "wm": {"activeBackground": "#131210", "activeForeground": "#f2eee8", "inactiveBackground": "#131210", "inactiveForeground": "#a39c91"},
 }
@@ -101,23 +109,28 @@ ContrastEffect=2
 Enable=false
 IntensityAmount=0
 IntensityEffect=0"""]
-    for name, bg in m["sets"].items():
-        parts.append(group(name, bg, m["fg"], m["deco"]))
+    def check(name, bg, fg, deco):
         for key in ("ForegroundNormal", "ForegroundInactive", "ForegroundLink", "ForegroundNegative", "ForegroundNeutral", "ForegroundPositive"):
             for b in bg:
-                if contrast(m["fg"][key], b) < 4.5:
-                    problems.append(f"{m['name']} {name}: {key} {m['fg'][key]} on {b} is {contrast(m['fg'][key], b):.2f}:1")
+                if contrast(fg[key], b) < 4.5:
+                    problems.append(f"{m['name']} {name}: {key} {fg[key]} on {b} is {contrast(fg[key], b):.2f}:1")
+        for b in bg:
+            if contrast(deco["DecorationFocus"], b) < 3:
+                problems.append(f"{m['name']} {name}: DecorationFocus {deco['DecorationFocus']} on {b} is "
+                                f"{contrast(deco['DecorationFocus'], b):.2f}:1")
+        parts.append(group(name, bg, fg, deco))
+    for name, bg in m["sets"].items():
+        check(name, bg, m["fg"], m["deco"])
     c = m["complementary"]
-    parts.append(group("Complementary", c["bg"], {**m["fg"], "ForegroundNormal": c["fg"], "ForegroundInactive": c["inactive"],
-                                                    "ForegroundLink": c["link"], "ForegroundActive": c["link"]}, m["deco"]))
+    check("Complementary", c["bg"], {"ForegroundNormal": c["fg"], "ForegroundInactive": c["inactive"], "ForegroundActive": c["link"],
+                                     "ForegroundLink": c["link"], "ForegroundVisited": c["visited"], "ForegroundNegative": c["negative"],
+                                     "ForegroundNeutral": c["neutral"], "ForegroundPositive": c["positive"]}, c["deco"])
     s = m["selection"]
     sel_fg = {k: s["fg"] for k in m["fg"]}
     sel_fg["ForegroundInactive"] = s["inactive"]
-    parts.append(group("Selection", s["bg"], sel_fg, m["deco"]))
-    for b in s["bg"]:
-        for key in ("fg", "inactive"):
-            if contrast(s[key], b) < 4.5:
-                problems.append(f"{m['name']} selection {key} {s[key]} on {b} is {contrast(s[key], b):.2f}:1")
+    # A focus ring on a selected row is drawn on the slate, so it takes the
+    # selection's text color: ink by day would be 2.3:1 on slate.
+    check("Selection", s["bg"], sel_fg, {**m["deco"], "DecorationFocus": s["fg"]})
     parts.append(f"[General]\nColorScheme={m['file']}\nName={m['name']}\nshadeSortColumn=true")
     parts.append("[KDE]\ncontrast=4")
     w = m["wm"]

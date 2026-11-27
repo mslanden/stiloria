@@ -1,0 +1,4 @@
+# While an app starts, the pointer carries its icon without bouncing it. The
+# task manager still shows the app starting.
+[BusyCursorSettings]
+Bouncing=false
